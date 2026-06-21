@@ -684,7 +684,7 @@ export default function App() {
 
             </div>
 
-            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW */}
+            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW
             {showGoogleChooser && (
               <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fadeIn">
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4">
@@ -696,7 +696,7 @@ export default function App() {
 
                   <div className="space-y-2">
                     {[
-                      { name: 'Danilo Rosco', email: 'Roscodanilo93@gmail.com', avatar: '😎' },
+                      { name: 'danilo rosco', email: 'Roscodanilo93@gmail.com', avatar: '😎' },
                       { name: 'Juan Dela Cruz', email: 'juan.delacruz@gmail.com', avatar: '👨' },
                       { name: 'Pinoy Gamer Pro', email: 'pinoy.gamer@gmail.com', avatar: '🎮' },
                     ].map((account) => (
@@ -731,6 +731,7 @@ export default function App() {
 
           </div>
         </div>
+*/}
       ) : (
         /* 📱 GATEWAY 2: AUTHENTICATED SYSTEM DASHBOARD */
         <>
@@ -829,7 +830,7 @@ export default function App() {
                   Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
-                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
+                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at kunin ang iyong reward!
                 </p>
               </div>
 
@@ -1125,19 +1126,19 @@ export default function App() {
                       <div className="space-y-1.5 border-b border-slate-100 pb-3">
                         <h4 className="font-extrabold text-[#0F172A] text-sm">💡 2. Pwede ko ba talagang i-withdraw ang naipon ko sa pamamagitan ng GCash?</h4>
                         <p>
-                          Oo, handog ng interface ang interactive simulated GCash payout workflow! Kapag umabot sa minimum limit na ₱100.00 ang inyong balance, magpunta sa "GCash Cash-Out" tab, ilagay ang iyong GCash details at sumite. Kapag inaprubahan ito ng administrative system sa server, kaagad itong sasalamin sa iyong logs, at sasagutin ng simulated network SMS confirmation!
+                          Oo, handog ng interface ang interactive simulated GCash payout workflow! Kapag umabot sa minimum limit na ₱100.00 ang inyong balance, magpunta sa "GCash Cash-Out" tab, ilagay ang iyong GCash details at sumite. Kapag inaprubahan ito ng administrative system sa server, kaagad itong makikita sa iyong logs, at sasagutin din ng simulated network SMS confirmation!
                         </p>
                       </div>
 
                       <div className="space-y-1.5 border-b border-slate-100 pb-3">
-                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 3. Ano ang Admin Panel at sino ang pwedeng mag-access nito?</h4>
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 3. Ano ang helpline Panel at sino ang pwedeng mag-access nito?</h4>
                         <p>
-                          Para makamit ang inyong kahilingan, meron kaming live administrator portal. Ang admin credentials ay asigned kay <strong>Roscodanilo93@gmail.com</strong> na may password na <strong>Titanvpn/10</strong>. Kapag naka-login gamit ito, lilitaw ang karagdagang navigation tab kung saan makikita ang listahan ng lahat ng registered user, ang kanilang holds balance, at kayo ang may ganap na kapangyarihan upang mag-approve (isent sa GCash) o mag-decline (i-refund) ng withdrawals.
+                          Para makamit ang inyong kahilingan, meron kaming live administrator portal. Ang admin credentials ay asigned sa <strong>Info.echozone@yahoo.com</strong>. Mag i-mail lamang gamit ito, at pakitandaan. Sytem generated ang may ganap na kapangyarihan upang mag-approve (isent sa GCash) o mag-decline (i-refund) ng withdrawals base sa aksyon at performance ng users.
                         </p>
                       </div>
 
                       <div className="space-y-1.5 pb-2">
-                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 4. Bakit kailangang mag-antay ng "Admin Approval" sa withdrawals?</h4>
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 4. Bakit kailangang mag-antay ng "Approval" sa withdrawals?</h4>
                         <p>
                           Ito ay para mapigilan ang mga mapagsamantalang gumagamit ng auto-clicker scripts o bots. Ang administrative approval system ay ang opisyal na tagasubaybay ng bawat activity logs bago tuluyang maproseso ang transaksyon papasok sa mock GCash core network.
                         </p>
@@ -1283,10 +1284,10 @@ export default function App() {
           <footer id="dashboard-footer" className="bg-white border-t border-slate-200 mt-12 py-6">
             <div className="max-w-7xl mx-auto px-4 text-center space-y-2 text-xs">
               <p className="font-bold text-slate-500">
-                © 2026 Website Visitor and GCash Rewards Simulation.
+                © 2026 Website Visitor and Z-oneApp Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong sistema. Maaring makaipon ng wasto sa depende sa partisipayon ng myembro ngunit hindi ginagartiya ang agarang benipisyo o rewards.
               </p>
             </div>
           </footer>
