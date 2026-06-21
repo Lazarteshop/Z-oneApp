@@ -666,7 +666,7 @@ export default function App() {
                 <hr className="flex-1 border-slate-850" />
               </div>
 
-              {/* GOOGLE SIGN IN SIMULATION TRIGGER */}
+              {/* GOOGLE SIGN IN SIMULATION TRIGGER*/}
               <button
                 type="button"
                 onClick={() => setShowGoogleChooser(true)}
@@ -684,8 +684,7 @@ export default function App() {
 
             </div>
 
-            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW
-            {showGoogleChooser && (
+            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW {showGoogleChooser && (
               <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fadeIn">
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4">
                   <div className="text-center">
@@ -730,8 +729,7 @@ export default function App() {
             </p>
 
           </div>
-        </div>
-*/}
+        </div>*/}
       ) : (
         /* 📱 GATEWAY 2: AUTHENTICATED SYSTEM DASHBOARD */
         <>
