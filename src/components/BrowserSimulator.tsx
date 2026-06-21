@@ -25,6 +25,7 @@ interface BrowserSimulatorProps {
   campaign: WebsiteCampaign;
   onComplete: (id: string, reward: number) => void;
   onClose: () => void;
+  language?: 'en' | 'tl';
 }
 
 // Captcha Option Type
@@ -34,7 +35,8 @@ interface CaptchaOption {
   emoji: string;
 }
 
-export default function BrowserSimulator({ campaign, onComplete, onClose }: BrowserSimulatorProps) {
+export default function BrowserSimulator({ campaign, onComplete, onClose, language = 'en' }: BrowserSimulatorProps) {
+  const isTl = language === 'tl';
   const [secondsLeft, setSecondsLeft] = useState(campaign.timer);
   const [isTimerFinished, setIsTimerFinished] = useState(false);
   const [captchaPassed, setCaptchaPassed] = useState(false);
@@ -48,7 +50,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Captcha choices database (Philippine/Common theme)
-  const ALL_CAPTCHA_ITEMS: CaptchaOption[] = [
+  const ALL_CAPTCHA_ITEMS: CaptchaOption[] = isTl ? [
     { id: 'pera', label: 'Pera / PHP Bill', emoji: '💵' },
     { id: 'mangga', label: 'Mangga (Mango)', emoji: '🥭' },
     { id: 'jeepney', label: 'Jeepney / Traysikel', emoji: '🛺' },
@@ -57,6 +59,15 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
     { id: 'pagkain', label: 'Ulam / Pagkain', emoji: '🍲' },
     { id: 'bahay', label: 'Bahay / Kubo', emoji: '🏠' },
     { id: 'kalesa', label: 'Kalesa / Kabayo', emoji: '🐴' },
+  ] : [
+    { id: 'pera', label: 'Money / PHP Bill', emoji: '💵' },
+    { id: 'mangga', label: 'Mango', emoji: '🥭' },
+    { id: 'jeepney', label: 'Jeepney / Tricycle', emoji: '🛺' },
+    { id: 'saging', label: 'Banana', emoji: '🍌' },
+    { id: 'computer', label: 'Computer / Mobile Phone', emoji: '📱' },
+    { id: 'pagkain', label: 'Food / Dishes', emoji: '🍲' },
+    { id: 'bahay', label: 'House / Hut', emoji: '🏠' },
+    { id: 'kalesa', label: 'Carriage / Horse', emoji: '🐴' },
   ];
 
   // Initialize Timer and Captcha
@@ -109,14 +120,18 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
     if (selectedOption.id === captchaTarget.id) {
       setCaptchaPassed(true);
       setErrorMessage(null);
-      setSuccessMessage(`💰 Kagandahang-loob! Napatunayan mo ang sarili. +₱${campaign.reward.toFixed(2)} GCash reward idinagdag!`);
+      setSuccessMessage(isTl 
+        ? `💰 Kagandahang-loob! Napatunayan mo ang sarili. +₱${campaign.reward.toFixed(2)} GCash reward idinagdag!` 
+        : `💰 Awesome! You verified yourself. +₱${campaign.reward.toFixed(2)} GCash reward added!`);
       
       // Delay call onComplete to let the animation finish
       setTimeout(() => {
         onComplete(campaign.id, campaign.reward);
       }, 1800);
     } else {
-      setErrorMessage('❌ Maling sagot. Tuminging mabuti at subukan muli ang Captcha!');
+      setErrorMessage(isTl 
+        ? '❌ Maling sagot. Tuminging mabuti at subukan muli ang Captcha!' 
+        : '❌ Incorrect answer. Look closely and try the Captcha again!');
        // Re-setup captcha with another option
       setTimeout(() => {
         setupCaptcha();
@@ -138,7 +153,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
               <span className={`relative inline-flex rounded-full h-3 w-3 ${isTimerFinished ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
             </span>
             <div>
-              <p className="text-xs text-slate-400 font-mono tracking-wider uppercase">Aktibong Pagbisita</p>
+              <p className="text-xs text-slate-400 font-mono tracking-wider uppercase">{isTl ? "Aktibong Pagbisita" : "Active Visit"}</p>
               <h2 className="text-sm font-bold text-slate-100 flex items-center gap-1">
                 {campaign.title}
                 <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded text-[10px] font-semibold border border-emerald-500/20">
@@ -175,8 +190,8 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                       </svg>
                     </div>
                     <div className="text-xs leading-tight">
-                      <p className="text-amber-400 font-semibold text-center md:text-left">Manatili muna rito</p>
-                      <p className="text-[10px] text-slate-300">Huwag i-close ang webpage</p>
+                      <p className="text-amber-400 font-semibold text-center md:text-left">{isTl ? "Manatili muna rito" : "Stay on this page"}</p>
+                      <p className="text-[10px] text-slate-300">{isTl ? "Huwag i-close ang webpage" : "Do not close the webpage"}</p>
                     </div>
                   </motion.div>
                 ) : captchaPassed ? (
@@ -187,7 +202,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                     className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500 text-emerald-400 px-4 py-2 rounded-xl text-xs font-semibold"
                   >
                     <CircleCheck className="w-4 h-4 text-emerald-400 animate-bounce" />
-                    <span>Tagumpay! Natanggap na ang Gantimpala!</span>
+                    <span>{isTl ? "Tagumpay! Natanggap na ang Gantimpala!" : "Success! Reward credited!"}</span>
                   </motion.div>
                 ) : (
                   <motion.div 
@@ -199,8 +214,12 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                     <div className="flex items-center gap-1.5 text-xs text-slate-200">
                       <HelpCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                       <div>
-                        <p className="font-semibold text-emerald-400">Patunayan na Tao ka:</p>
-                        <p className="text-[11px] text-slate-300">Piliin ang <span className="font-bold underline text-white">{captchaTarget?.label}</span> sa ibaba</p>
+                        <p className="font-semibold text-emerald-400">{isTl ? "Patunayan na Tao ka:" : "Verify you are Human:"}</p>
+                        <p className="text-[11px] text-slate-300">
+                          {isTl 
+                            ? <>Piliin ang <span className="font-bold underline text-white">{captchaTarget?.label}</span> sa ibaba</> 
+                            : <>Select the <span className="font-bold underline text-white">{captchaTarget?.label}</span> below</>}
+                        </p>
                       </div>
                     </div>
 
@@ -306,8 +325,8 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
             {/* Header / Brand Area */}
             <div className="px-6 py-6 md:py-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
               <div>
-                <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Adbins Partner Advertiser</span>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1">
+                <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{isTl ? "Adbins Partner Advertiser" : "Partner Advertiser"}</span>
+                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mt-1 font-sans">
                   {campaign.mockPageContent.heroTitle}
                 </h1>
                 <p className="text-xs md:text-sm text-slate-600 mt-1 font-medium">
@@ -319,7 +338,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                 style={{ backgroundColor: campaign.mockPageContent.primaryColor }}
               >
                 <Compass className="w-3.5 h-3.5 animate-spin-slow" />
-                <span>Bisita muna</span>
+                <span>{isTl ? "Bisita muna" : "Visiting"}</span>
               </div>
             </div>
 
@@ -341,7 +360,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                   <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
                     <h3 className="font-bold text-slate-950 mb-3 flex items-center gap-1.5 text-sm md:text-base">
                       <TrendingUp className="w-5 h-5 text-indigo-500" />
-                      <span>Mga Tampok na Impormasyon / Hakbang:</span>
+                      <span>{isTl ? "Mga Tampok na Impormasyon / Hakbang:" : "Key Features & Steps Guide:"}</span>
                     </h3>
                     <ul className="space-y-3">
                       {campaign.mockPageContent.features.map((feat, idx) => (
@@ -357,13 +376,13 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                 {/* Offers/Rates lists if any */}
                 {campaign.mockPageContent.offers && (
                   <div className="space-y-3">
-                    <h4 className="font-bold text-slate-900 text-sm md:text-base">🔥 Espesyal na mga Alok at Presyo ngayon:</h4>
+                    <h4 className="font-bold text-slate-900 text-sm md:text-base">{isTl ? "🔥 Espesyal na mga Alok at Presyo ngayon:" : "🔥 Special Today: Deals & Promo Rates:"}</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {campaign.mockPageContent.offers.map((offer, idx) => (
                         <div key={idx} className="p-3.5 bg-yellow-50 border border-yellow-200/60 rounded-xl text-xs md:text-sm text-yellow-900 flex justify-between items-center">
                           <span className="font-semibold">{offer.split(' - ')[0]}</span>
                           <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded text-[11px] shrink-0 ml-2">
-                            {offer.split(' - ')[1] || 'Tingnan'}
+                            {offer.split(' - ')[1] || (isTl ? 'Tingnan' : 'View')}
                           </span>
                         </div>
                       ))}
@@ -374,14 +393,14 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                 {/* Static Interactive Elements for simulated landing page engagement */}
                 <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-xs text-slate-500">
-                    © 2026 {campaign.title.split(' ')[0]} Media. Nakareserba lahat ng karapatan.
+                    © 2026 {campaign.title.split(' ')[0]} Media. {isTl ? "Nakareserba lahat ng karapatan." : "All rights reserved."}
                   </div>
                   <div className="flex gap-2">
                     <button className="px-3 py-1.5 bg-slate-150 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition cursor-pointer">
-                      Ibahagi ang Tipid Hacks
+                      {isTl ? "Ibahagi ang Tipid Hacks" : "Share Life Hacks"}
                     </button>
                     <button className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition cursor-pointer">
-                      Mag-subscribe sa Alerts
+                      {isTl ? "Mag-subscribe sa Alerts" : "Subscribe to Alerts"}
                     </button>
                   </div>
                 </div>
@@ -396,24 +415,26 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                   <div className="bg-indigo-100 text-indigo-700 text-[9px] font-bold tracking-wider rounded px-1.5 py-0.5 uppercase inline-block mx-auto mb-2">
                     Simulated Sponsor Card
                   </div>
-                  <h4 className="font-bold text-slate-900 text-sm mb-1">May sarili ka bang Negosyo?</h4>
+                  <h4 className="font-bold text-slate-900 text-sm mb-1">{isTl ? "May sarili ka bang Negosyo?" : "Own a Business?"}</h4>
                   <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-                    Maaari mo ring i-advertise ang iyong website homepage dito para makakuha ng libo-libong organic na bisita kada araw!
+                    {isTl 
+                      ? "Maaari mo ring i-advertise ang iyong website homepage dito para makakuha ng libo-libong organic na bisita kada araw!" 
+                      : "You can also advertise your website homepage here to reach thousands of organic simulated visitors daily!"}
                   </p>
                   <button className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition cursor-not-allowed" disabled>
-                    I-promote ang Aking Web (Soon)
+                    {isTl ? "I-promote ang Aking Web (Soon)" : "Promote My Web (Soon)"}
                   </button>
                 </div>
 
                 {/* Simulated Security Check */}
                 <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
-                  <h5 className="font-bold text-xs text-slate-400 tracking-wider uppercase">Seguridad at Privacy</h5>
+                  <h5 className="font-bold text-xs text-slate-400 tracking-wider uppercase">{isTl ? "Seguridad at Privacy" : "Security & Privacy"}</h5>
                   
                   <div className="flex items-start gap-2 text-xs">
                     <Lock className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-slate-800">SSL Encrypted</p>
-                      <p className="text-slate-500">Ang iyong session ay ligtas at mayroong end-to-end security certificate.</p>
+                      <p className="text-slate-500">{isTl ? "Ang iyong session ay ligtas at mayroong end-to-end security certificate." : "Your slot session is guarded with trusted end-to-end encryption."}</p>
                     </div>
                   </div>
 
@@ -421,7 +442,7 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                     <Smartphone className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-bold text-slate-800">Multi-Device Compatible</p>
-                      <p className="text-slate-500">Mabilis na naglo-load sa Cellphone, Tablet, at desktop monitor.</p>
+                      <p className="text-slate-500">{isTl ? "Mabilis na naglo-load sa Cellphone, Tablet, at desktop monitor." : "Loads beautifully responsive on Mobile devices, Tablets and Desktops."}</p>
                     </div>
                   </div>
                 </div>
@@ -431,8 +452,12 @@ export default function BrowserSimulator({ campaign, onComplete, onClose }: Brow
                   <div className="flex gap-2">
                     <AlertCircle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
                     <div className="text-xs text-amber-900">
-                      <p className="font-bold">May problem ba sa countdown?</p>
-                      <p className="mt-1 leading-relaxed">Maaari mong pabilisin o i-restart ang tracker gamit ang <RotateCw className="inline w-3 h-3 mx-0.5" /> Reload icon sa Address bar.</p>
+                      <p className="font-bold">{isTl ? "May problem ba sa countdown?" : "Stuck Countdown?"}</p>
+                      <p className="mt-1 leading-relaxed">
+                        {isTl 
+                          ? <>Maaari mong pabilisin o i-restart ang tracker gamit ang <RotateCw className="inline w-3 h-3 mx-0.5" /> Reload icon sa Address bar.</>
+                          : <>You can easily boost or restart the timer with the <RotateCw className="inline w-3 h-3 mx-0.5" /> Reload Icon in the Address bar.</>}
+                      </p>
                     </div>
                   </div>
                 </div>

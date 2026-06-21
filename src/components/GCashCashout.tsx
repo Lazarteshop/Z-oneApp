@@ -21,10 +21,12 @@ import { WithdrawalRequest, UserStats } from '../types';
 interface GCashCashoutProps {
   stats: UserStats;
   withdrawals: WithdrawalRequest[];
-  onWithdrawSubmit: (accountName: string, gcashNumber: string, amount: number) => { success: boolean; message: string };
+  onWithdrawSubmit: (accountName: string, gcashNumber: string, amount: number) => Promise<{ success: boolean; message: string }> | { success: boolean; message: string };
+  language?: 'en' | 'tl';
 }
 
-export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: GCashCashoutProps) {
+export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit, language = 'en' }: GCashCashoutProps) {
+  const isTl = language === 'tl';
   const [accountName, setAccountName] = useState('');
   const [gcashNumber, setGcashNumber] = useState('');
   const [amountStr, setAmountStr] = useState('');
@@ -46,33 +48,33 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
 
     // Form validation
     if (!accountName.trim()) {
-      setErrorMsg('⚠️ Nakalimutang ilagay ang GCash Account Name.');
+      setErrorMsg(isTl ? '⚠️ Nakalimutang ilagay ang GCash Account Name.' : '⚠️ Please enter GCash Account Name.');
       return;
     }
 
     if (!gcashNumber.trim()) {
-      setErrorMsg('⚠️ Nakalimutang ilagay ang GCash Mobile Number.');
+      setErrorMsg(isTl ? '⚠️ Nakalimutang ilagay ang GCash Mobile Number.' : '⚠️ Please enter GCash Mobile Number.');
       return;
     }
 
     if (!validateGcashNumber(gcashNumber)) {
-      setErrorMsg('⚠️ Maling format ng Mobile Number. Dapat ay 11-digit na nagsisimula sa "09" (Hal. 09171234567).');
+      setErrorMsg(isTl ? '⚠️ Maling format ng Mobile Number. Dapat ay 11-digit na nagsisimula sa "09" (Hal. 09171234567).' : '⚠️ Invalid Mobile Number. It must be an 11-digit number starting with "09" (e.g. 09171234567).');
       return;
     }
 
     const value = parseFloat(amountStr);
     if (isNaN(value) || value <= 0) {
-      setErrorMsg('⚠️ Maglagay ng tamang sapat na halaga ng pera.');
+      setErrorMsg(isTl ? '⚠️ Maglagay ng tamang sapat na halaga ng pera.' : '⚠️ Please enter a valid withdrawal amount.');
       return;
     }
 
     if (value < 100) {
-      setErrorMsg('⚠️ May limitasyon: Ang minimum na withdrawal ay nagkakahalaga ng ₱100.00.');
+      setErrorMsg(isTl ? '⚠️ May limitasyon: Ang minimum na withdrawal ay nagkakahalaga ng ₱100.00.' : '⚠️ Limit: Minimum withdrawal amount is ₱100.00.');
       return;
     }
 
     if (value > stats.balance) {
-      setErrorMsg(`⚠️ Hindi sapat ang pondo. Ang kasalukuyang balance mo ay ₱${stats.balance.toFixed(2)}.`);
+      setErrorMsg(isTl ? `⚠️ Hindi sapat ang pondo. Ang kasalukuyang balance mo ay ₱${stats.balance.toFixed(2)}.` : `⚠️ Insufficient funds. Your current balance is ₱${stats.balance.toFixed(2)}.`);
       return;
     }
 
@@ -80,18 +82,23 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
     setIsSubmitting(true);
     
     // Simulate real database and secure API payout transfer delay
-    setTimeout(() => {
-      const res = onWithdrawSubmit(accountName.trim(), gcashNumber.trim(), value);
-      setIsSubmitting(false);
-      
-      if (res.success) {
-        setSuccessMsg(res.message);
-        // Reset inputs
-        setAccountName('');
-        setGcashNumber('');
-        setAmountStr('');
-      } else {
-        setErrorMsg(res.message);
+    setTimeout(async () => {
+      try {
+        const res = await onWithdrawSubmit(accountName.trim(), gcashNumber.trim(), value);
+        setIsSubmitting(false);
+        
+        if (res.success) {
+          setSuccessMsg(res.message);
+          // Reset inputs
+          setAccountName('');
+          setGcashNumber('');
+          setAmountStr('');
+        } else {
+          setErrorMsg(res.message);
+        }
+      } catch (err) {
+        setIsSubmitting(false);
+        setErrorMsg(isTl ? '⚠️ May error sa pagkonekta sa network.' : '⚠️ Connection error occurred.');
       }
     }, 1200);
   };
@@ -102,7 +109,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
       setAmountStr(preset.toString());
       setErrorMsg(null);
     } else {
-      setErrorMsg(`⚠️ Hindi sapat ang pondo para sa preset na ₱${preset}.00`);
+      setErrorMsg(isTl ? `⚠️ Hindi sapat ang pondo para sa preset na ₱${preset}.00` : `⚠️ Insufficient balance for preset ₱${preset}.00`);
     }
   };
 
@@ -120,21 +127,21 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
             <Wallet className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-extrabold text-slate-900 text-lg">GCash Cash-Out Request</h3>
-            <p className="text-xs text-slate-500">I-withdraw ang iyong napanalunang totoong premyo rekta sa iyong GCash wallet.</p>
+            <h3 className="font-extrabold text-slate-900 text-lg">{isTl ? "GCash Cash-Out Request" : "GCash Cash-Out Request"}</h3>
+            <p className="text-xs text-slate-500">{isTl ? "I-withdraw ang iyong napanalunang totoong premyo rekta sa iyong GCash wallet." : "Withdraw your earned simulated rewards directly to your GCash wallet."}</p>
           </div>
         </div>
 
         {/* Available Wallet Status widget inside form */}
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-4.5 mb-6 flex justify-between items-center sm:grid sm:grid-cols-2 sm:gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Kasunod na Maibubulsa</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{isTl ? "Kasunod na Maibubulsa" : "Withdrawable Balance"}</p>
             <p className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
               ₱{stats.balance.toFixed(2)}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 sm:text-right">Minimum na Widthrawal</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 sm:text-right">{isTl ? "Minimum na Widthrawal" : "Minimum Withdrawal"}</p>
             <p className="text-sm font-extrabold text-blue-600 mt-0.5 sm:text-right">
               ₱100.00 PHP
             </p>
@@ -147,24 +154,24 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
           {/* Account Name input */}
           <div className="space-y-1.5">
             <label htmlFor="withdraw-name" className="text-xs font-bold text-slate-700 block">
-              GCash Full Name (Pangalan sa GCash) <span className="text-red-500">*</span>
+              {isTl ? "GCash Full Name (Pangalan sa GCash)" : "GCash Registered Full Name"} <span className="text-red-500">*</span>
             </label>
             <input
               id="withdraw-name"
               type="text"
               required
-              placeholder="Hal. JUAN DELA CRUZ"
+              placeholder={isTl ? "Hal. JUAN DELA CRUZ" : "e.g. JOHN DOE"}
               value={accountName}
               onChange={(e) => setAccountName(e.target.value.toUpperCase())}
               className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:bg-white rounded-xl px-4 py-3 text-sm transition outline-none font-semibold uppercase placeholder:normal-case placeholder:font-normal"
             />
-            <p className="text-[10px] text-slate-400">Siguraduhing tugma sa GCash registered name upang maiwasan ang delay sa pagpapadala.</p>
+            <p className="text-[10px] text-slate-400">{isTl ? "Siguraduhing tugma sa GCash registered name upang maiwasan ang delay sa pagpapadala." : "Please ensure this matches your registered GCash name to prevent delay."}</p>
           </div>
 
           {/* GCash number input */}
           <div className="space-y-1.5">
             <label htmlFor="withdraw-phone" className="text-xs font-bold text-slate-700 block">
-              GCash Mobile Number (Numero sa GCash) <span className="text-red-500">*</span>
+              {isTl ? "GCash Mobile Number (Numero sa GCash)" : "GCash Mobile Number"} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 font-mono">
@@ -181,13 +188,13 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
                 className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:bg-white rounded-xl pl-11 pr-4 py-3 text-sm transition outline-none font-mono font-bold tracking-wider"
               />
             </div>
-            <p className="text-[10px] text-slate-400">Magsimula sa "09" at pormat na may eksaktong 11-digits.</p>
+            <p className="text-[10px] text-slate-400">{isTl ? "Magsimula sa \"09\" at pormat na may eksaktong 11-digits." : "Start with \"09\" and enter exactly 11 digits."}</p>
           </div>
 
           {/* Amount selection group */}
           <div className="space-y-2">
             <label htmlFor="withdraw-amount" className="text-xs font-bold text-slate-700 block">
-              Halaga na Iwi-withdraw (PHP) <span className="text-red-500">*</span>
+              {isTl ? "Halaga na Iwi-withdraw (PHP)" : "Withdrawal Amount (PHP)"} <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-bold text-slate-500">
@@ -199,7 +206,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
                 required
                 min="100"
                 step="1"
-                placeholder="Minimun 100"
+                placeholder={isTl ? "Minimum 100" : "Minimum 100"}
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:bg-white rounded-xl pl-8 pr-12 py-3 text-sm font-black text-slate-900 outline-none"
@@ -234,12 +241,12 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
                   if (stats.balance >= 100) {
                     setAmountStr(Math.floor(stats.balance).toString());
                   } else {
-                    setErrorMsg('⚠️ Hindi sapat ang pondo upang i-withdraw lahat. Minimum ay ₱100.00.');
+                    setErrorMsg(isTl ? '⚠️ Hindi sapat ang pondo upang i-withdraw lahat. Minimum ay ₱100.00.' : '⚠️ Insufficient balance to withdraw all. Minimum is ₱100.00.');
                   }
                 }}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition cursor-pointer"
               >
-                I-Max Lahat (₱{Math.floor(stats.balance)})
+                {isTl ? `I-Max Lahat (₱${Math.floor(stats.balance)})` : `Max All (₱${Math.floor(stats.balance)})`}
               </button>
             </div>
           </div>
@@ -267,7 +274,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
               >
                 <CheckCircle className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
                 <div>
-                  <p className="font-bold">Ipinaabot na sa GCash System!</p>
+                  <p className="font-bold">{isTl ? "Ipinaabot na sa GCash System!" : "Sent to GCash System!"}</p>
                   <p className="mt-0.5 leading-relaxed">{successMsg}</p>
                 </div>
               </motion.div>
@@ -291,18 +298,18 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Pinapadala sa GCash Network...</span>
+                <span>{isTl ? "Pinapadala sa GCash Network..." : "Sending to GCash Network..."}</span>
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                <span>Kumpirmahin at I-withdraw ang Pera</span>
+                <span>{isTl ? "Kumpirmahin at I-withdraw ang Pera" : "Confirm and Withdraw Rewards"}</span>
               </>
             )}
           </button>
 
           <p className="text-center text-[11px] text-slate-400">
-            Ang pag-withdraw ay instant simulated transfer. Karaniwang pumapasok sa loob ng 10-30 segundo sa listahan.
+            {isTl ? "Ang pag-withdraw ay instant simulated transfer. Karaniwang pumapasok sa loob ng 10-30 segundo sa listahan." : "Withdrawals are processed as simulated real-time transfers within 10-30 seconds."}
           </p>
 
         </form>
@@ -316,22 +323,22 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
         <div className="bg-gradient-to-br from-blue-700 to-blue-800 rounded-2xl p-5 text-white shadow-sm font-sans">
           <div className="flex justify-between items-start mb-4">
             <span className="font-black tracking-widest text-lg font-mono">G) GCash</span>
-            <span className="bg-white/20 text-[9px] font-bold uppercase rounded px-1.5 py-0.5">Verified Partner</span>
+            <span className="bg-white/20 text-[9px] font-bold uppercase rounded px-1.5 py-0.5">{isTl ? "Verified Partner" : "Verified Partner"}</span>
           </div>
 
-          <h4 className="font-extrabold text-sm mb-1.5">Paano maging mabilis ang Transaksyon?</h4>
+          <h4 className="font-extrabold text-sm mb-1.5">{isTl ? "Paano maging mabilis ang Transaksyon?" : "How to expedite processing?"}</h4>
           <ul className="space-y-2.5 text-xs text-blue-100 leading-normal">
             <li className="flex gap-2">
               <span className="bg-white/20 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-              <span>Gamitin ang iyong certified o verified GCash Account upang maiwasan ang anti-spam at bot checks ng aming automatic system.</span>
+              <span>{isTl ? "Gamitin ang iyong certified o verified GCash Account upang maiwasan ang anti-spam at bot checks ng aming automatic system." : "Use your registered, certified GCash details to automatically pass the simulated spam filters."}</span>
             </li>
             <li className="flex gap-2">
               <span className="bg-white/20 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
-              <span>Siguraduhing buhay ang inyong telecom signal (Globe/TM/Smart/TNT) sapagkat maaari kayong makatanggap ng simulated SMS confirmation alert.</span>
+              <span>{isTl ? "Siguraduhing buhay ang inyong telecom signal (Globe/TM/Smart/TNT) sapagkat maaari kayong makatanggap ng simulated SMS confirmation alert." : "Keep your cellular notifications on to receive instant simulated network SMS alerts."}</span>
             </li>
             <li className="flex gap-2">
               <span className="bg-white/20 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">3</span>
-              <span>Abangan ang reference number na makikita sa listahan para sa kumpirmasyon.</span>
+              <span>{isTl ? "Abangan ang reference number na makikita sa listahan para sa kumpirmasyon." : "Confirm matching reference numbers listed in the transaction ledger logs."}</span>
             </li>
           </ul>
         </div>
@@ -341,7 +348,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <History className="w-4 h-4 text-slate-500" />
-              <h4 className="font-bold text-slate-900 text-sm">Kasaysayan ng Withdrawal</h4>
+              <h4 className="font-bold text-slate-900 text-sm">{isTl ? "Kasaysayan ng Withdrawal" : "Withdrawal History"}</h4>
             </div>
             <span className="text-[10px] text-slate-400 font-mono font-bold">
               Total ({withdrawals.length})
@@ -353,8 +360,8 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
             {withdrawals.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center py-10 text-slate-400">
                 <FileSpreadsheet className="w-10 h-10 stroke-1 mb-2 text-slate-350" />
-                <p className="text-xs font-semibold">Wala pang naitatalang Withdrawal.</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Magsimula ng pagbisita sa homepage ng mga website upang makatipon ng pondo!</p>
+                <p className="text-xs font-semibold">{isTl ? "Wala pang naitatalang Withdrawal." : "No withdrawals logged yet."}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{isTl ? "Magsimula ng pagbisita sa homepage ng mga website upang makatipon ng pondo!" : "Start visiting website homepages to accumulate withdrawable balance!"}</p>
               </div>
             ) : (
               [...withdrawals].reverse().map((req) => (
@@ -375,17 +382,17 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit }: G
                       {req.status === 'success' ? (
                         <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold rounded px-1.5 py-0.5 flex items-center gap-0.5">
                           <Check className="w-2.5 h-2.5" />
-                          <span>Success</span>
+                          <span>{isTl ? "Success" : "Success"}</span>
                         </span>
                       ) : req.status === 'processing' || req.status === 'pending' ? (
                         <span className="bg-amber-100 text-amber-800 text-[9px] font-bold rounded px-1.5 py-0.5 flex items-center gap-1 animate-pulse">
                           <Clock className="w-2.5 h-2.5" />
-                          <span>Pinoproseso</span>
+                          <span>{isTl ? "Pinoproseso" : "Processing"}</span>
                         </span>
                       ) : (
                         <span className="bg-red-100 text-red-800 text-[9px] font-bold rounded px-1.5 py-0.5 flex items-center gap-0.5">
                           <XIcon className="w-2.5 h-2.5" />
-                          <span>Bigo</span>
+                          <span>{isTl ? "Bigo" : "Failed"}</span>
                         </span>
                       )}
                     </div>

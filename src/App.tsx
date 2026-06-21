@@ -27,18 +27,56 @@ import {
   Plus,
   Moon,
   Sun,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Mail,
+  User,
+  UserPlus,
+  ShieldAlert,
+  LogOut,
+  RefreshCw,
+  Shield,
+  Award
 } from 'lucide-react';
 import { INITIAL_CAMPAIGNS } from './data/campaigns';
-import { WebsiteCampaign, WithdrawalRequest, ActivityLog, UserStats } from './types';
+import { WebsiteCampaign, WithdrawalRequest, ActivityLog, UserStats, ReferralFriend } from './types';
 import BrowserSimulator from './components/BrowserSimulator';
 import GCashCashout from './components/GCashCashout';
 import ReferralPanel from './components/ReferralPanel';
+import AdminPanel from './components/AdminPanel';
+
+interface UserSession {
+  id: string;
+  email: string;
+  name: string;
+  avatar: string;
+  isAdmin: boolean;
+  referralCode: string;
+  stats: UserStats;
+  withdrawals: WithdrawalRequest[];
+  activityLogs: ActivityLog[];
+  referredFriends: ReferralFriend[];
+}
 
 export default function App() {
-  // --- CORE STATE ENGINE ---
+  // --- AUTHENTICATION & SYNC STATES ---
+  const [token, setToken] = useState<string | null>(localStorage.getItem('gcash_click_earn_token'));
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
+  // Form states
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+  const [referralInput, setReferralInput] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
+
+  // --- CORE APP STATES ---
   const [stats, setStats] = useState<UserStats>({
-    balance: 25.00, // Initial free bonus of ₱25.00
+    balance: 25.00,
     lifetimeEarnings: 25.00,
     completedTasksCount: 0,
     dailyCheckInDate: null
@@ -47,196 +85,150 @@ export default function App() {
   const [campaigns, setCampaigns] = useState<WebsiteCampaign[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'earn' | 'cashout' | 'guide'>('earn');
+  const [referredFriends, setReferredFriends] = useState<ReferralFriend[]>([]);
   
-  // Custom Campaign Inputs
-  const [customTitle, setCustomTitle] = useState('');
-  const [customUrl, setCustomUrl] = useState('');
-  const [customTimer, setCustomTimer] = useState(15);
-  const [customCategory, setCustomCategory] = useState<'Shopping' | 'Balita' | 'Teknolohiya' | 'E-Services' | 'Kultura'>('Teknolohiya');
-  
-  // Active Browser Simulator Overlay View
+  const [activeTab, setActiveTab] = useState<'earn' | 'cashout' | 'guide' | 'admin'>('earn');
   const [currentViewingCampaign, setCurrentViewingCampaign] = useState<WebsiteCampaign | null>(null);
 
-  // Success Claim Animation State
+  // Add custom campaigns state
+  const [customTitle, setCustomTitle] = useState('');
+  const [customUrl, setCustomUrl] = useState('');
+  const [customReward, setCustomReward] = useState('0.75');
+  const [customTimer, setCustomTimer] = useState('15');
+  const [campaignFilter, setCampaignFilter] = useState<'all' | 'high' | 'available'>('all');
+
+  // Animation states
   const [floatingCoinReward, setFloatingCoinReward] = useState<number | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  
+  // Language switcher state (English default)
+  const [language, setLanguage] = useState<'en' | 'tl'>((localStorage.getItem('user_lang') as 'en' | 'tl') || 'en');
 
-  // Feedback Notification banner state
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-
-  // --- INITIAL LOAD & SYNC SYSTEM ---
   useEffect(() => {
-    // 1. Load Stats
-    const savedStats = localStorage.getItem('gcash_click_earn_stats');
-    if (savedStats) {
-      try {
-        setStats(JSON.parse(savedStats));
-      } catch (err) {
-        console.error('Error loading stats', err);
-      }
-    }
+    localStorage.setItem('user_lang', language);
+  }, [language]);
 
-    // 2. Load Campaigns (Merge initial campaigns with custom saved ones)
-    const savedCampaigns = localStorage.getItem('gcash_click_earn_campaigns');
-    if (savedCampaigns) {
-      try {
-        const parsed = JSON.parse(savedCampaigns) as WebsiteCampaign[];
-        // Filter campaigns to avoid duplicate default items
-        const defaultIds = INITIAL_CAMPAIGNS.map(c => c.id);
-        const customOnly = parsed.filter(c => !defaultIds.includes(c.id));
-        setCampaigns([...INITIAL_CAMPAIGNS, ...customOnly]);
-      } catch (err) {
-        setCampaigns(INITIAL_CAMPAIGNS);
-      }
-    } else {
-      setCampaigns(INITIAL_CAMPAIGNS);
-    }
-
-    // 3. Load Withdrawals
-    const savedWithdrawals = localStorage.getItem('gcash_click_earn_withdrawals');
-    if (savedWithdrawals) {
-      try {
-        setWithdrawals(JSON.parse(savedWithdrawals));
-      } catch (err) {
-        console.error('Error loading withdrawals', err);
-      }
-    }
-
-    // 4. Load Logs
-    const savedLogs = localStorage.getItem('gcash_click_earn_logs');
-    if (savedLogs) {
-      try {
-        setActivityLogs(JSON.parse(savedLogs));
-      } catch (err) {
-        console.error('Error loading logs', err);
-      }
-    } else {
-      // Setup initial welcome log
-      const welcomeLog: ActivityLog = {
-        id: 'log-welcome',
-        type: 'bonus',
-        title: 'Salamat sa pagre-register! Libreng Pang-umpisang Pera',
-        amount: 25.00,
-        timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-        details: 'Nakatanggap ka ng libreng ₱25.00 bilang Welcome Gift.'
-      };
-      setActivityLogs([welcomeLog]);
-    }
-  }, []);
-
-  // --- PERSISTENCE SYNCHRONIZER WRAPPERS ---
-  const saveStats = (newStats: UserStats) => {
-    setStats(newStats);
-    localStorage.setItem('gcash_click_earn_stats', JSON.stringify(newStats));
-  };
-
-  const saveCampaigns = (newCampaigns: WebsiteCampaign[]) => {
-    setCampaigns(newCampaigns);
-    localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(newCampaigns));
-  };
-
-  const saveWithdrawals = (newWithdrawals: WithdrawalRequest[]) => {
-    setWithdrawals(newWithdrawals);
-    localStorage.setItem('gcash_click_earn_withdrawals', JSON.stringify(newWithdrawals));
-  };
-
-  const saveLogs = (newLogs: ActivityLog[]) => {
-    setActivityLogs(newLogs);
-    localStorage.setItem('gcash_click_earn_logs', JSON.stringify(newLogs));
-  };
-
-  // Trigger brief alert notifications
+  // --- NOTIFICATION BANNER STATE ---
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => {
-      setNotification(null);
+      setNotification((curr) => curr?.message === message ? null : curr);
     }, 4500);
   };
 
-  // --- GCASH AUTO-PROCESSOR SIMULATION ENGINE ---
-  // Periodically check and advance pending/processing withdrawals to make backend feel real and dynamic
+  // --- COMPILATION & SETUP EFFECTS ---
+
+  // Check for auto referral code in URL parameters
   useEffect(() => {
-    const interval = setInterval(() => {
-      let isChanged = false;
-      const updatedWithdrawals = withdrawals.map((w) => {
-        if (w.status === 'pending') {
-          isChanged = true;
-          return { ...w, status: 'processing' as const };
-        } else if (w.status === 'processing') {
-          isChanged = true;
-          // Randomly succeed
-          return { ...w, status: 'success' as const };
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      setReferralInput(ref);
+      setAuthMode('register');
+      triggerNotification(`🔗 Referral Link na-detect! Awtomatikong sinali sa ref code: ${ref}`, 'info');
+    }
+  }, []);
+
+  // Fetch or sync user profile
+  const fetchUserProfile = async (authToken: string) => {
+    setLoadingProfile(true);
+    try {
+      const res = await fetch('/api/user/profile', {
+        headers: {
+          'Authorization': authToken
         }
-        return w;
       });
-
-      if (isChanged) {
-        saveWithdrawals(updatedWithdrawals);
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+        setStats(data.user.stats);
+        setWithdrawals(data.user.withdrawals);
+        setActivityLogs(data.user.activityLogs);
+        setReferredFriends(data.user.referredFriends);
         
-        // Find if we just finished one and log it
-        const pendingW = withdrawals.find(w => w.status === 'pending');
-        const processingW = withdrawals.find(w => w.status === 'processing');
-
-        if (processingW) {
-          const newLog: ActivityLog = {
-            id: 'log-status-' + Date.now(),
-            type: 'withdraw',
-            title: `Ang GCash Out na nagkakahalaga ng ₱${processingW.amount.toFixed(2)} ay ganap nang Pumasok!`,
-            amount: processingW.amount,
-            timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-            details: `Tagumpay na naipadala sa GCash Ni ${processingW.accountName} (${processingW.gcashNumber}). Reference No: ${processingW.referenceNo}`
-          };
-          saveLogs([newLog, ...activityLogs]);
-          triggerNotification(`🎉 GCash Transfer na ₱${processingW.amount.toFixed(2)} ay Success na!`, 'success');
-        } else if (pendingW) {
-          triggerNotification(`🔄 Sumusulong ang GCash queue: Pinoproseso na ang withdrawal mo...`, 'info');
+        // Load custom or default campaigns
+        const localC = localStorage.getItem('gcash_click_earn_campaigns');
+        if (localC) {
+          setCampaigns(JSON.parse(localC));
+        } else {
+          // Initialize with default tasks and mark those existing in user completion
+          const mapped = INITIAL_CAMPAIGNS.map(c => ({
+            ...c,
+            completed: data.user.activityLogs.some((l: any) => l.type === 'reward' && l.title.includes(c.title))
+          }));
+          setCampaigns(mapped);
+          localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(mapped));
         }
-      }
-    }, 15000); // Check every 15 seconds
 
+        // Auto transition into admin panel tab if they are logged in as admin to save steps
+        if (data.user.isAdmin && activeTab === 'earn') {
+          setActiveTab('admin');
+        }
+      } else {
+        // Token has expired or is invalid
+        handleLogout();
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Connection error sa pag-load ng inyong Profile.', 'error');
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  // Trigger sync on login status change
+  useEffect(() => {
+    if (token) {
+      fetchUserProfile(token);
+    } else {
+      setUser(null);
+    }
+  }, [token]);
+
+  // Periodic active polling check to sync admin or other devices' actions
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetchUserProfile(token);
+    }, 10000); // Poll every 10 seconds to align with admin approvals/declines instantly
     return () => clearInterval(interval);
-  }, [withdrawals, activityLogs]);
+  }, [token, activeTab]);
 
   // --- CORE SYSTEM CONTROLLER ACTIONS ---
 
-  // 1. Daily Bonus Check-In
-  const handleDailyCheckIn = () => {
-    const todayStr = new Date().toDateString();
-    
-    if (stats.dailyCheckInDate === todayStr) {
-      triggerNotification('⚠️ Nakuha mo na ang iyong Araw-araw na Bonus ngayon! Bumalik muli bukas.', 'error');
-      return;
+  // 1. Daily Bonus Check-In Hook
+  const handleDailyCheckIn = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/user/daily-checkin', {
+        method: 'POST',
+        headers: {
+          'Authorization': token
+        }
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setUser(result.user);
+        setStats(result.user.stats);
+        setActivityLogs(result.user.activityLogs);
+        
+        // Show visual coin rewards
+        setFloatingCoinReward(5.00);
+        setShowConfetti(true);
+        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        setTimeout(() => {
+          setFloatingCoinReward(null);
+          setShowConfetti(false);
+        }, 4000);
+      } else {
+        triggerNotification(`⚠️ ${result.error || 'Hindi ma-claim ang bonus.'}`, 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Error connecting to server.', 'error');
     }
-
-    const reward = 5.00;
-    const newStats: UserStats = {
-      ...stats,
-      balance: stats.balance + reward,
-      lifetimeEarnings: stats.lifetimeEarnings + reward,
-      dailyCheckInDate: todayStr
-    };
-    saveStats(newStats);
-
-    const newLog: ActivityLog = {
-      id: 'checkin-' + Date.now(),
-      type: 'bonus',
-      title: 'Araw-araw na Bonus Claimed!',
-      amount: reward,
-      timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-      details: 'Gantimpala para sa araw-araw na pag-bisita at pagsuporta sa app.'
-    };
-    saveLogs([newLog, ...activityLogs]);
-
-    // Show visual coin rewards
-    setFloatingCoinReward(reward);
-    setShowConfetti(true);
-    triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
-
-    setTimeout(() => {
-      setFloatingCoinReward(null);
-      setShowConfetti(false);
-    }, 4000);
   };
 
   // 2. Open Website homepage for earning
@@ -245,90 +237,92 @@ export default function App() {
   };
 
   // 3. Complete browser simulator task
-  const handleCompleteCampaignView = (id: string, reward: number) => {
-    const updatedCampaigns = campaigns.map((c) => {
-      if (c.id === id) {
-        return { ...c, completed: true };
-      }
-      return c;
-    });
-    saveCampaigns(updatedCampaigns);
+  const handleCompleteCampaignView = async (id: string, reward: number) => {
+    if (!token) return;
 
     const matchCampaign = campaigns.find(c => c.id === id);
     const label = matchCampaign ? matchCampaign.title : 'Web Homepage View';
 
-    const newStats: UserStats = {
-      ...stats,
-      balance: stats.balance + reward,
-      lifetimeEarnings: stats.lifetimeEarnings + reward,
-      completedTasksCount: stats.completedTasksCount + 1
-    };
-    saveStats(newStats);
+    try {
+      const res = await fetch('/api/user/task-complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({
+          rewardAmount: reward,
+          title: `Natapos panoorin ang ${label}`,
+          details: `Salamat sa pag-open at pananatili sa homepage ng ${label} nang ${matchCampaign?.timer || 10} segundo.`
+        })
+      });
 
-    const newLog: ActivityLog = {
-      id: 'view-reward-' + Date.now(),
-      type: 'reward',
-      title: `Natapos panoorin ang ${label}`,
-      amount: reward,
-      timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-      details: `Salamat sa pag-open at pananatili sa homepage ng ${label} nang ${matchCampaign?.timer} segundo.`
-    };
-    saveLogs([newLog, ...activityLogs]);
-    
-    // Animate Coin Floating
-    setFloatingCoinReward(reward);
-    setShowConfetti(true);
+      const result = await res.json();
+      if (res.ok) {
+        setUser(result.user);
+        setStats(result.user.stats);
+        setActivityLogs(result.user.activityLogs);
+        
+        // Mark campaign as completed locally
+        const updatedCampaigns = campaigns.map((c) => {
+          if (c.id === id) {
+            return { ...c, completed: true };
+          }
+          return c;
+        });
+        setCampaigns(updatedCampaigns);
+        localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(updatedCampaigns));
 
-    // Close browser overlay
-    setCurrentViewingCampaign(null);
-    triggerNotification(`💰 Matagumpay! Naka-ipon ka ng +₱${reward.toFixed(2)}`, 'success');
+        // Animate Coin Floating
+        setFloatingCoinReward(reward);
+        setShowConfetti(true);
+        setCurrentViewingCampaign(null);
+        triggerNotification(`💰 Matagumpay! Naka-ipon ka ng +₱${reward.toFixed(2)}`, 'success');
 
-    setTimeout(() => {
-      setFloatingCoinReward(null);
-      setShowConfetti(false);
-    }, 4000);
+        setTimeout(() => {
+          setFloatingCoinReward(null);
+          setShowConfetti(false);
+        }, 4000);
+      } else {
+        triggerNotification(`⚠️ ${result.error || 'Hindi mate-record ang task.'}`, 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Connection error recording completions.', 'error');
+    }
   };
 
   // 4. Submit GCash Withdrawal
-  const handleWithdrawalRequest = (accountName: string, gcashNumber: string, amount: number) => {
-    if (amount > stats.balance) {
-      return { success: false, message: 'Hindi sapat ang inyong active balance.' };
+  const handleWithdrawalRequest = async (accountName: string, gcashNumber: string, amount: number) => {
+    if (!token) return { success: false, message: 'Naka-logout ka.' };
+
+    try {
+      const res = await fetch('/api/user/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({ accountName, gcashNumber, amount })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setUser(result.user);
+        setStats(result.user.stats);
+        setWithdrawals(result.user.withdrawals);
+        setActivityLogs(result.user.activityLogs);
+        triggerNotification(`💸 Sumite ng Cashout (Binubuo)`, 'success');
+        return { 
+          success: true, 
+          message: `Ang transaksyon ay ipapadala sa iyong GCash number ${gcashNumber}. Ang iyong request ay naghihintay ng Admin (Roscodanilo93@gmail.com) Approval.` 
+        };
+      } else {
+        return { success: false, message: result.error || 'Hindi maiproseso.' };
+      }
+    } catch (e) {
+      console.error(e);
+      return { success: false, message: 'Server connection error.' };
     }
-
-    const randomRef = 'REF' + Math.floor(10000000 + Math.random() * 90000000);
-    const newRequest: WithdrawalRequest = {
-      id: 'withdraw-' + Date.now(),
-      accountName,
-      gcashNumber,
-      amount,
-      status: 'pending',
-      createdAt: new Date().toLocaleString('en-US', { hour12: true }),
-      referenceNo: randomRef
-    };
-
-    const newWithdrawalsList = [...withdrawals, newRequest];
-    saveWithdrawals(newWithdrawalsList);
-
-    const newStats: UserStats = {
-      ...stats,
-      balance: stats.balance - amount
-    };
-    saveStats(newStats);
-
-    const newLog: ActivityLog = {
-      id: 'log-withdraw-' + Date.now(),
-      type: 'withdraw',
-      title: `Sumite ng Cashout (Binubuo)`,
-      amount,
-      timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-      details: `Nag-request ng cashout sa pangalang ${accountName} (${gcashNumber}). Ang iyong hiling ay naitabi sa database para sa automatic verification.`
-    };
-    saveLogs([newLog, ...activityLogs]);
-
-    return { 
-      success: true, 
-      message: `Ang transaksyon ay ipapadala lunas sa iyong GCash number ${gcashNumber}. Ang reference ID mo ay ${randomRef}.` 
-    };
   };
 
   // 5. Add Custom Website Campaign
@@ -345,703 +339,959 @@ export default function App() {
       return;
     }
 
-    // URL format patch
     let finalUrl = customUrl.trim();
     if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
       finalUrl = 'https://' + finalUrl;
     }
 
-    // Dynamic Reward Calculation: Longer timer = bigger payout simulator value!
-    // We provide a baseline pay formula: seconds * 0.75
-    const computedReward = parseFloat((customTimer * 0.75).toFixed(2));
+    const rewardNum = parseFloat(customReward);
+    const timerNum = parseInt(customTimer);
 
-    const newCampaignId = 'custom-' + Date.now();
     const newCampaign: WebsiteCampaign = {
-      id: newCampaignId,
+      id: 'custom-' + Date.now(),
       title: customTitle.trim(),
       url: finalUrl,
-      reward: computedReward,
-      timer: customTimer,
-      logo: 'Globe',
-      category: customCategory,
-      description: `Espesyal na custom homepage campaign para sa ${customTitle.trim()}. Interaktibong basahin ang balita o portal upang kumita.`,
+      reward: isNaN(rewardNum) ? 0.75 : rewardNum,
+      timer: isNaN(timerNum) ? 15 : timerNum,
       completed: false,
+      logo: 'Globe',
+      category: 'E-Services',
+      description: 'Isang verified advertiser page para mas palawakin ang iyong simulated earnings.',
       mockPageContent: {
-        heroTitle: `🌐 Welcome sa Link: ${customTitle.trim()}`,
-        heroSubtitle: `Digital landing page guide para sa domain na ${finalUrl.replace('https://', '').replace('http://', '').split('/')[0]}`,
-        primaryColor: '#0F172A', // Premium Slate Dark
-        accentColor: '#3B82F6',
+        heroTitle: customTitle.trim(),
+        heroSubtitle: 'Maligayang pagdating sa aming isinadyang simulated ad landing partner. Manatili rito para sa automated GCash rewards!',
+        primaryColor: 'from-blue-700 to-indigo-800',
+        accentColor: 'bg-emerald-400 text-slate-900',
         paragraphs: [
-          `Salamat sa pag-open ng webpage na ito. Ang sponsor ng link na ito ay nagnanais na i-promote ang kanilang mga digital homepage services, magbasa ng balita, o ipakita ang kanilang tech reviews sa ating mga partner mobile affiliates.`,
-          `Ikaw ay binabayaran ng ₱${computedReward.toFixed(2)} pesos sapagkat nire-record ng aming analytical system ang tyaga mo rito nang humigit-kumulang sa ${customTimer} segundo.`
+          'Salamat sa pagsuporta at pagbisita sa aming page upang matulungan kaming mai-optimize ang search visibility index.',
+          'Ang simulated traffic flow na ito ay ligtas at direktang naka-link sa iyong aktibong user profile account.'
         ],
         features: [
-          `💡 Pangalan ng Domain: ${finalUrl}`,
-          `⌚ Oras na itatagal: Panoorin ng saktong ${customTimer} seconds`,
-          `💵 Halagang matatanggap: ₱${computedReward.toFixed(2)} PHP`,
-          `🤖 Captcha safe secure: Piliting sagutan ng tama pagkatapos ng takdang segundo.`
-        ],
-        offers: [
-          `Advertiser Verified Status - Active`,
-          `Reward System Score - 100% Quality Output`
+          'SEO Rank Optimization',
+          'Automated Traffic Validation',
+          'Fast Rewards Payout Credits'
         ]
       }
     };
 
-    const newCampaignsList = [...campaigns, newCampaign];
-    saveCampaigns(newCampaignsList);
+    const updated = [newCampaign, ...campaigns];
+    setCampaigns(updated);
+    localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(updated));
 
-    // Reset Form Fields
     setCustomTitle('');
     setCustomUrl('');
-    setCustomTimer(15);
-    triggerNotification(`🎉 Matagumpay! Naidagdag ang "${customTitle.trim()}" na nagbibigay ng ₱${computedReward.toFixed(2)} reward!`, 'success');
+    triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at panoorin para may mapanalunang ₱${newCampaign.reward.toFixed(2)}.`, 'success');
   };
 
-  // 6. Earn Referral Link Milestones Invite Bonus
-  const handleAddReferralReward = (amount: number, logTitle: string, logDetails: string) => {
-    const newStats: UserStats = {
-      ...stats,
-      balance: stats.balance + amount,
-      lifetimeEarnings: stats.lifetimeEarnings + amount
-    };
-    saveStats(newStats);
+  // --- AUTHENTICATION INTERFACE HANDLERS ---
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
 
-    const newLog: ActivityLog = {
-      id: 'referral-bonus-' + Date.now(),
-      type: 'bonus',
-      title: logTitle,
-      amount: amount,
-      timestamp: new Date().toLocaleString('en-US', { hour12: true }),
-      details: logDetails
-    };
-    saveLogs([newLog, ...activityLogs]);
+    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+    const payload = authMode === 'login' 
+      ? { email: emailInput.trim(), password: passwordInput }
+      : { name: nameInput.trim(), email: emailInput.trim(), password: passwordInput, referralCode: referralInput.trim() };
 
-    // Show visual floating animation
-    setFloatingCoinReward(amount);
-    setShowConfetti(true);
-    triggerNotification(`💰 Matagumpay! Nakuha mo ang +₱${amount.toFixed(2)} referral reward!`, 'success');
-
-    setTimeout(() => {
-      setFloatingCoinReward(null);
-      setShowConfetti(false);
-    }, 4000);
-  };
-
-  // --- RENDERING HANDLERS FOR CATEGORY ICONS ---
-  const renderCampaignIcon = (logoName: string) => {
-    switch (logoName) {
-      case 'ShoppingBag':
-        return <ShoppingBag className="w-5 h-5 text-orange-500" />;
-      case 'Newspaper':
-        return <Newspaper className="w-5 h-5 text-blue-500" />;
-      case 'Wallet':
-        return <Wallet className="w-5 h-5 text-indigo-500" />;
-      case 'Globe':
-      default:
-        return <Globe className="w-5 h-5 text-emerald-500" />;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (res.ok) {
+        localStorage.setItem('gcash_click_earn_token', result.token);
+        setToken(result.token);
+        triggerNotification(authMode === 'login' ? '🔑 Welcome back!' : '🎉 Welcome! Tagumpay na ginawa ang account mo.', 'success');
+      } else {
+        setAuthError(result.error || 'May error sa authentication.');
+      }
+    } catch (err) {
+      console.error(err);
+      setAuthError('Hindi makakonekta sa central server.');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
+  const handleSimulatedGoogleLogin = async (selectedName: string, selectedEmail: string, avatar: string) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: selectedName,
+          email: selectedEmail,
+          avatar: avatar
+        })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        localStorage.setItem('gcash_click_earn_token', result.token);
+        setToken(result.token);
+        setShowGoogleChooser(false);
+        triggerNotification(`🌐 Nag-sign in gamit ang Google: Hello, ${selectedName}!`, 'success');
+      } else {
+        setAuthError(result.error);
+      }
+    } catch (e) {
+      setAuthError('Connection error resolving Google session.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('gcash_click_earn_token');
+    setToken(null);
+    setUser(null);
+    setActiveTab('earn');
+    triggerNotification('🔒 Ligtas kang naka-logout sa controller.', 'info');
+  };
+
+  // --- FILTERS LOGIC ---
+  const filteredCampaigns = campaigns.filter((c) => {
+    if (campaignFilter === 'high') return c.reward >= 1.00;
+    if (campaignFilter === 'available') return !c.completed;
+    return true;
+  });
+
   return (
-    <div id="application-root" className="min-h-screen bg-slate-50 flex flex-col font-sans transition-colors duration-300">
+    <div id="application-sandbox-root" className="min-h-screen bg-slate-100 flex flex-col text-slate-800 font-sans antialiased selection:bg-blue-600 selection:text-white">
       
-      {/* 🔔 Floating Alerts & Toast Notification Feed */}
+      {/* 🔔 FLOATING NOTIFICATION SYSTEM */}
       <AnimatePresence>
         {notification && (
           <motion.div
             initial={{ opacity: 0, y: -50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4"
-          >
-            <div className={`p-4 rounded-xl border-2 shadow-xl flex items-center gap-3 ${
-              notification.type === 'success' 
-                ? 'bg-emerald-50 border-emerald-400 text-emerald-900' 
+            id="system-banner"
+            className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 max-w-md w-[90%] p-4 rounded-2xl shadow-xl border flex items-start gap-3 backdrop-blur-md ${
+              notification.type === 'success'
+                ? 'bg-emerald-50/95 border-emerald-200 text-emerald-950'
                 : notification.type === 'error'
-                ? 'bg-red-50 border-red-400 text-red-900'
-                : 'bg-blue-50 border-blue-400 text-blue-900'
+                ? 'bg-rose-50/95 border-rose-200 text-rose-950'
+                : 'bg-indigo-50/95 border-indigo-200 text-indigo-950'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl shrink-0 ${
+              notification.type === 'success' ? 'bg-emerald-100' : notification.type === 'error' ? 'bg-rose-100' : 'bg-indigo-100'
             }`}>
-              {notification.type === 'success' ? (
-                <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-              ) : notification.type === 'error' ? (
-                <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-              ) : (
-                <Activity className="w-5 h-5 text-blue-500 shrink-0" />
-              )}
-              <span className="text-xs font-bold leading-normal">{notification.message}</span>
+              {notification.type === 'success' ? '💰' : notification.type === 'error' ? '🚨' : 'ℹ️'}
+            </div>
+            <div className="flex-1">
+              <span className="text-xs font-extrabold block text-slate-400 uppercase tracking-widest leading-none mb-1">GCash Rewards Alert</span>
+              <p className="text-xs font-bold leading-normal">{notification.message}</p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 🪙 FLOATING COIN ANIMATION LAYER */}
+      {/* 🪙 FLOATING COINS OVERLAYS ANIMATION */}
       <AnimatePresence>
         {floatingCoinReward !== null && (
-          <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-            
-            {/* Darken backing */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-900" 
-            />
-
-            {/* Glowing gold medal/coin floating up */}
-            <motion.div
-              initial={{ scale: 0.2, y: 200, opacity: 0 }}
-              animate={{ scale: [1, 1.3, 1], y: -50, opacity: 1 }}
-              exit={{ scale: 0.5, y: -250, opacity: 0 }}
-              transition={{ duration: 1.5, ease: 'easeOut' }}
-              className="relative bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 rounded-full w-40 h-40 flex flex-col items-center justify-center shadow-2xl border-4 border-yellow-200"
-            >
-              <Coins className="w-16 h-16 text-yellow-950 animate-bounce" />
-              <span className="text-3xl font-black text-yellow-950 tracking-tighter mt-1">
-                +₱{floatingCoinReward.toFixed(2)}
-              </span>
-              <span className="text-[10px] font-black text-amber-900 tracking-wider uppercase bg-white/40 px-2 py-0.5 rounded-full mt-1.5">
-                Saved! & Claimed
-              </span>
-
-              {/* Little simulated particle shapes */}
-              <div className="absolute top-1/4 -left-10 text-2xl animate-pulse">💵</div>
-              <div className="absolute top-3/4 -right-10 text-2xl animate-pulse">✨</div>
-              <div className="absolute -top-10 right-1/4 text-2xl">💰</div>
-            </motion.div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, y: 100 }}
+            animate={{ opacity: [1, 1, 0], scale: [1, 1.3, 1], y: -100 }}
+            transition={{ duration: 1.5 }}
+            className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center"
+          >
+            <div className="bg-gradient-to-br from-yellow-300 to-amber-500 text-slate-950 p-6 rounded-full shadow-2xl flex flex-col items-center justify-center border-4 border-yellow-200 aspect-square min-w-[120px]">
+              <Coins className="w-10 h-10 animate-repeat animate-bounce" />
+              <div className="text-xl font-black mt-1 font-mono">+₱{floatingCoinReward.toFixed(2)}</div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 🚀 MAIN HEADER DASHBOARD BRAND BLOCK */}
-      <div id="dashboard-brand-header" className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white shadow-lg overflow-hidden relative">
-        
-        {/* Subtle glowing abstract shape backgrounds */}
-        <div className="absolute -right-16 -top-16 w-60 h-60 bg-blue-500/20 rounded-full blur-2xl"></div>
-        <div className="absolute left-1/3 -bottom-10 w-44 h-44 bg-indigo-500/10 rounded-full blur-xl"></div>
-
-        <div className="max-w-7xl mx-auto px-4 py-6 md:py-8 relative">
+      {/* 🚀 SCREEN GATEWAY 1: NOT AUTHENTICATED SCREEN */}
+      {!token || !user ? (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-12 relative overflow-hidden">
           
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6">
+          {/* Ambient Cosmic Neon background lights */}
+          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-indigo-600/10 blur-3xl" />
+
+          <div className="max-w-md w-full space-y-6 z-10">
             
-            {/* Title / User profile info */}
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <span className="absolute bottom-0 right-0 h-4 w-4 bg-emerald-500 border-2 border-slate-900 rounded-full" title="Active"></span>
-                <div className="bg-blue-600 border-2 border-blue-400 h-14 w-14 rounded-2xl flex items-center justify-center font-black text-xl text-yellow-300 shadow-inner">
-                  🇵🇭
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="bg-emerald-500 text-[10px] font-extrabold uppercase text-slate-950 px-1.5 py-0.5 rounded tracking-wide">
-                    Live Simulator
-                  </span>
-                  <span className="text-slate-200 text-xs flex items-center gap-1">
-                    <UserCheck className="w-3.5 h-3.5 text-blue-300" />
-                    <span>GCash Affiliate ID: a97ac-6ad</span>
-                  </span>
-                </div>
-                <h1 className="text-xl md:text-2xl font-black text-white tracking-tight mt-1 flex items-center gap-2">
-                  Visitor Rewards Pera Hub
-                </h1>
-                <p className="text-xs text-blue-150 mt-0.5 font-medium"> Kumita ng Pera sa GCash sa pamamagitan ng pag-view ng mga Web Homepage!</p>
-              </div>
+            {/* LOGO TITLE */}
+            <div className="text-center space-y-2">
+              <span className="mx-auto bg-blue-600 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full flex items-center gap-1 w-max">
+                <Coins className="w-3.5 h-3.5 text-yellow-300 animate-bounce" />
+                <span>ACTIVE EARNING PORTAL</span>
+              </span>
+              <h1 className="text-3xl font-black text-white tracking-tight leading-none">
+                G-Click & Earn Homepage
+              </h1>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto font-semibold">
+                Simulan ang pagbisita sa mga verified web homepage upang makakuha ng automated GCash cashout rewards!
+              </p>
             </div>
 
-            {/* WALLET AND REWARDS CENTER STATUS */}
-            <div className="flex items-center gap-4 self-center md:self-auto">
+            {/* MAIN CREDENTIAL CARD */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 relative">
               
-              {/* CURRENT BALANCE */}
-              <div className="bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl p-4 min-w-[170px] backdrop-blur-sm transition">
-                <div className="flex items-center justify-between gap-3 text-blue-200 text-[10px] font-bold uppercase tracking-wider">
-                  <span>Kasalukuyang Balance</span>
-                  <Coins className="w-4 h-4 text-yellow-300 animate-spin-slow" />
-                </div>
-                <div className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">
-                  <span className="text-yellow-300 mr-0.5">₱</span>
-                  {stats.balance.toFixed(2)}
-                </div>
-                <p className="text-[10px] text-emerald-300 mt-1 font-semibold flex items-center gap-1">
-                  <span>● Ligtas at Pwedeng i-GCash</span>
-                </p>
+              {/* Form Tab Toggles */}
+              <div className="flex border-b border-slate-850 gap-2 text-xs font-black">
+                <button
+                  onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                  className={`flex-1 py-2.5 transition rounded-t-xl cursor-pointer ${
+                    authMode === 'login' 
+                      ? 'border-b-2 border-blue-500 text-blue-400 bg-white/5' 
+                      : 'text-slate-500 hover:text-slate-350'
+                  }`}
+                >
+                  Naka-rehistro (Login)
+                </button>
+                <button
+                  onClick={() => { setAuthMode('register'); setAuthError(null); }}
+                  className={`flex-1 py-2.5 transition rounded-t-xl cursor-pointer ${
+                    authMode === 'register' 
+                      ? 'border-b-2 border-blue-500 text-blue-400 bg-white/5' 
+                      : 'text-slate-500 hover:text-slate-350'
+                  }`}
+                >
+                  Gawa ng Account (Register)
+                </button>
               </div>
 
-              {/* DAILY CHECK IN ACTION */}
+              {/* AUTH FORM */}
+              <form onSubmit={handleAuthSubmit} className="space-y-3.5 text-xs text-slate-300">
+                
+                {/* Name - Register only */}
+                {authMode === 'register' && (
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-400 flex items-center gap-1.5">
+                      <User className="w-4 h-4" />
+                      <span>Buong Pangalan (Profile Name-Admin Visibility)</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Hal. Danilo Rosco"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
+                    />
+                  </div>
+                )}
+
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-400 flex items-center gap-1.5">
+                    <Mail className="w-4 h-4" />
+                    <span>Email Address</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Hal. Roscodanilo93@gmail.com"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-400 flex items-center gap-1.5">
+                    <Lock className="w-4 h-4" />
+                    <span>Password</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Wag kalimutan"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
+                  />
+                </div>
+
+                {/* Optional Referral Code - Register only */}
+                {authMode === 'register' && (
+                  <div className="space-y-1.5 animate-fadeIn">
+                    <label className="font-bold text-slate-400 flex items-center gap-1.5">
+                      <UserPlus className="w-4 h-4 text-emerald-400" />
+                      <span>Referral Code (Opsyonal - pwedeng maiwan na blangko)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Hal. REF-123456"
+                      value={referralInput}
+                      onChange={(e) => setReferralInput(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600 truncate uppercase"
+                    />
+                  </div>
+                )}
+
+                {/* Feedbacks */}
+                {authError && (
+                  <div className="p-3 bg-red-950/85 border border-red-900 rounded-xl flex items-start gap-2 text-[11px] text-red-300 leading-normal">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                    <span className="font-bold">{authError}</span>
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition py-3 rounded-xl text-white font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  {authLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : authMode === 'login' ? (
+                    'I-verify at Mag-login'
+                  ) : (
+                    'Gumawa ng Account at Simulan'
+                  )}
+                </button>
+
+              </form>
+
+              {/* DIVIDER */}
+              <div className="flex items-center gap-2 pt-2">
+                <hr className="flex-1 border-slate-850" />
+                <span className="text-[10px] text-slate-500 font-black">OR INTEGRATE WITH</span>
+                <hr className="flex-1 border-slate-850" />
+              </div>
+
+              {/* GOOGLE SIGN IN SIMULATION TRIGGER */}
               <button
-                id="daily-bonus-checking-btn"
-                onClick={handleDailyCheckIn}
-                className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
+                type="button"
+                onClick={() => setShowGoogleChooser(true)}
+                className="w-full bg-white text-slate-950 hover:bg-slate-100 transition py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
               >
-                <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                <span>₱5.00 Araw Bonus</span>
+                {/* Custom Google logo */}
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.12 2.76-2.38 3.6v3h3.84c2.25-2.07 3.68-5.11 3.68-8.43z" />
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.84-3c-1.07.72-2.44 1.16-4.09 1.16-3.15 0-5.81-2.12-6.76-5h-3.97v3.08C3.25 21.84 7.31 24 12 24z" />
+                  <path fill="#FBBC05" d="M5.24 14.25c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3V6.57H1.27C.46 8.2.01 10.05.01 12s.45 3.8 1.26 5.43l3.97-3.18z" />
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.16 1.27 5.73l3.97 3.08c.95-2.88 3.61-5 6.76-5z" />
+                </svg>
+                <span>Google Sign-In at Google Sign-Up</span>
               </button>
 
             </div>
 
-          </div>
-
-        </div>
-
-      </div>
-
-      {/* 🧭 NAVIGATION TABS CONTROL BAR */}
-      <div id="dashboard-navigation-tabs" className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-4">
-          
-          <div className="flex gap-1 py-3 overflow-x-auto shrink-0">
-            {[
-              { id: 'earn', label: '🌐 Mag-ipon ng Pera (Website Lists)', icon: Globe },
-              { id: 'cashout', label: '💳 GCash Cash-Out (Withdraw)', icon: Wallet },
-              { id: 'guide', label: '📖 Gabay sa Paggamit (FAQs)', icon: HelpCircle }
-            ].map((tab) => {
-              const IconComp = tab.icon;
-              const isSelected = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  id={`nav-tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4.5 py-2.5 rounded-xl font-extrabold text-sm transition cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-                    isSelected
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
-                >
-                  <IconComp className="w-4.5 h-4.5 shrink-0" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="hidden sm:flex items-center gap-1.5 font-mono text-[11px] text-slate-500 font-bold border-l border-slate-200 pl-4 py-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Server Time: Jun 2026</span>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 🖥️ MAIN BODY WORKSPACE */}
-      <div id="main-content-layout" className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 md:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          
-          {/* TAB SHEETS ZONE (LHS - 3 COLUMNS) */}
-          <div className="lg:col-span-3 space-y-6">
-            
-            {/* TAB 1: EARN CONTENT (VISITOR AD BLOCK) */}
-            {activeTab === 'earn' && (
-              <div className="space-y-6 animate-fadeIn">
-                
-                {/* Intro Title */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                  <div>
-                    <h2 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
-                      <Compass className="w-5 h-5 text-blue-600" />
-                      <span>Mga Pinagtitiwalaang Web Campaigns ngayong araw</span>
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated GCash bonus.</p>
-                  </div>
-                  <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/50 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span>Naka-ipon ngayon: {stats.completedTasksCount} Website Views</span>
-                  </div>
-                </div>
-
-                {/* Grid Lists of Campaigns */}
-                <div id="campaigns-grid-layout" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {campaigns.map((camp) => (
-                    <div
-                      key={camp.id}
-                      id={`campaign-card-${camp.id}`}
-                      className={`bg-white rounded-2xl border p-5 flex flex-col justify-between transition group hover:shadow-md ${
-                        camp.completed 
-                          ? 'border-emerald-200/60 shadow-inner bg-emerald-50/20' 
-                          : 'border-slate-200'
-                      }`}
-                    >
-                      <div>
-                        {/* Categories & High-visual payouts badge */}
-                        <div className="flex items-center justify-between gap-2 mb-3.5">
-                          <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border tracking-wide scale-95 origin-left ${
-                            camp.completed 
-                              ? 'bg-emerald-100 border-emerald-200 text-emerald-800'
-                              : camp.category === 'Shopping'
-                              ? 'bg-orange-50 border-orange-200 text-orange-700'
-                              : camp.category === 'Balita'
-                              ? 'bg-blue-50 border-blue-200 text-blue-700'
-                              : camp.category === 'E-Services'
-                              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                          }`}>
-                            {camp.category}
-                          </span>
-
-                          <div className="flex items-center gap-1.5 font-sans font-black text-sm text-slate-900">
-                            <span className="text-[10px] text-slate-400 font-bold">Payout:</span>
-                            <span className="text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">
-                              ₱{camp.reward.toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Title and Logo */}
-                        <div className="flex gap-2.5 items-start">
-                          <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl group-hover:scale-105 transition shrink-0">
-                            {renderCampaignIcon(camp.logo)}
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-extrabold text-slate-900 text-sm md:text-base leading-tight group-hover:text-blue-700 transition truncate">
-                              {camp.title}
-                            </h3>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{camp.url}</p>
-                          </div>
-                        </div>
-
-                        {/* Description */}
-                        <p className="text-xs text-slate-650 mt-3 leading-relaxed line-clamp-2">
-                          {camp.description}
-                        </p>
-                      </div>
-
-                      {/* Card Lower actions footer */}
-                      <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Dapat manatili: <strong className="text-slate-700 font-bold">{camp.timer}s</strong></span>
-                        </div>
-
-                        {camp.completed ? (
-                          <button
-                            id={`campaign-view-btn-${camp.id}`}
-                            onClick={() => handleOpenCampaign(camp)}
-                            className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Done (Open again)</span>
-                          </button>
-                        ) : (
-                          <button
-                            id={`campaign-view-btn-${camp.id}`}
-                            onClick={() => handleOpenCampaign(camp)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-4.5 py-2.5 rounded-xl transition shadow-sm cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                          >
-                            <span>🔍 Bisitahin ang Homepage</span>
-                          </button>
-                        )}
-                      </div>
-
-                    </div>
-                  ))}
-                </div>
-
-                {/* 🔗 STUNNING CUSTOM HOMEPAGE CREATOR FORM BOX */}
-                <div id="custom-homepage-creator-box" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-indigo-600"></div>
-
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                      <PlusCircle className="w-5.5 h-5.5" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-base">Magdagdag ng Iyong Personal na Website Homepage</h3>
-                      <p className="text-xs text-slate-500">Subukang i-paste ang iyong paboritong website upang i-simulate ang real-world visitors view reward.</p>
-                    </div>
+            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW */}
+            {showGoogleChooser && (
+              <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fadeIn">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4">
+                  <div className="text-center">
+                    <span className="text-2xl">👤</span>
+                    <h3 className="font-extrabold text-white text-sm mt-1">Google Accounts Chooser</h3>
+                    <p className="text-[11px] text-slate-400">Pumili ng mock Google Profile upang mag-sign in agad.</p>
                   </div>
 
-                  <form onSubmit={handleCreateCustomCampaign} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    
-                    {/* Campaign Title */}
-                    <div className="md:col-span-2 space-y-1.5">
-                      <label htmlFor="custom-campaign-title" className="text-xs font-bold text-slate-700 block">Website Title (Pamagat)</label>
-                      <input
-                        id="custom-campaign-title"
-                        type="text"
-                        required
-                        placeholder="Hal. Aking Personal na Blog"
-                        value={customTitle}
-                        onChange={(e) => setCustomTitle(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs transition outline-none font-semibold"
-                      />
-                    </div>
-
-                    {/* URL link */}
-                    <div className="md:col-span-2 space-y-1.5">
-                      <label htmlFor="custom-campaign-url" className="text-xs font-bold text-slate-700 block">Homepage URL</label>
-                      <input
-                        id="custom-campaign-url"
-                        type="text"
-                        required
-                        placeholder="Hal. www.mywebblog.com"
-                        value={customUrl}
-                        onChange={(e) => setCustomUrl(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs transition outline-none font-mono"
-                      />
-                    </div>
-
-                    {/* Category Selection */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="custom-campaign-cat" className="text-xs font-bold text-slate-700 block">Kategorya</label>
-                      <select
-                        id="custom-campaign-cat"
-                        value={customCategory}
-                        onChange={(e) => setCustomCategory(e.target.value as any)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-700 cursor-pointer"
-                      >
-                        <option value="Teknolohiya">💻 Teknolohiya</option>
-                        <option value="Shopping">🛍️ Shopping</option>
-                        <option value="Balita">📰 Balita</option>
-                        <option value="E-Services">⚡ E-Services</option>
-                        <option value="Kultura">🍲 Kultura</option>
-                      </select>
-                    </div>
-
-                    {/* Timer selector */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="custom-campaign-timer" className="text-xs font-bold text-slate-700 block">Dapat Manatili (Segundo)</label>
-                      <select
-                        id="custom-campaign-timer"
-                        value={customTimer}
-                        onChange={(e) => setCustomTimer(parseInt(e.target.value))}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-extrabold text-slate-700 cursor-pointer"
-                      >
-                        <option value="10">10 segundo (Payout: ₱7.50)</option>
-                        <option value="15">15 segundo (Payout: ₱11.25)</option>
-                        <option value="20">20 segundo (Payout: ₱15.00)</option>
-                        <option value="30">30 segundo (Payout: ₱22.50)</option>
-                      </select>
-                    </div>
-
-                    {/* Action button */}
-                    <div className="md:col-span-2">
+                  <div className="space-y-2">
+                    {[
+                      { name: 'Danilo Rosco', email: 'Roscodanilo93@gmail.com', avatar: '😎' },
+                      { name: 'Juan Dela Cruz', email: 'juan.delacruz@gmail.com', avatar: '👨' },
+                      { name: 'Pinoy Gamer Pro', email: 'pinoy.gamer@gmail.com', avatar: '🎮' },
+                    ].map((account) => (
                       <button
-                        type="submit"
-                        id="add-custom-btn"
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold text-xs py-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                        key={account.email}
+                        onClick={() => handleSimulatedGoogleLogin(account.name, account.email, account.avatar)}
+                        className="w-full bg-slate-850 hover:bg-slate-800 border border-slate-800/60 p-3 rounded-xl flex items-center gap-3 transition text-left cursor-pointer"
                       >
-                        <Plus className="w-4 h-4" />
-                        <span>I-create at Idagdag sa Labada</span>
+                        <span className="text-2xl">{account.avatar}</span>
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-white text-xs leading-none">{account.name}</h4>
+                          <p className="text-[10px] text-slate-400 truncate mt-1">{account.email}</p>
+                        </div>
+                        <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded ml-auto">Simulated</span>
                       </button>
-                    </div>
+                    ))}
+                  </div>
 
-                  </form>
-                  <p className="text-[10px] text-slate-400 mt-2">
-                    💡 Paalaala: Atin itong binibigyan ng simulated rate na <strong>₱0.75 kada segundo</strong> ng pagpanatili bilang gantimpala ng system.
+                  <button
+                    onClick={() => setShowGoogleChooser(false)}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 rounded-xl"
+                  >
+                    I-cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <p className="text-center text-[10px] text-slate-600 leading-normal max-w-sm mx-auto">
+              Sa pamamagitan ng pag-sign in, sumasang-ayon ka sa interactive simulator guidelines. Ang admin panel ay ma-oopen gamit ang nakalaang Email.
+            </p>
+
+          </div>
+        </div>
+      ) : (
+        /* 📱 GATEWAY 2: AUTHENTICATED SYSTEM DASHBOARD */
+        <>
+          {/* HEADER BAR */}
+          <header id="dashboard-header" className="bg-slate-900 border-b border-slate-800 text-white py-4 shadow-md sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              
+              {/* BRAND / IDENTITY */}
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 bg-blue-600 rounded-2xl shadow-md flex items-center justify-center animate-pulse">
+                  <Coins className="w-6 h-6 text-yellow-300" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-black text-lg tracking-tight">Earning Dashboard</h1>
+                    {user.isAdmin && (
+                      <span className="bg-red-500 text-white text-[9px] font-black tracking-widest uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                        <Shield className="w-3 h-3 text-yellow-250 animate-bounce" />
+                        <span>OWNER ADMIN</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makatipon ng totoong pera.</p>
+                </div>
+              </div>
+
+              {/* USER PROFILE CARD AND METRICS */}
+              <div className="flex items-center gap-3">
+                {/* 🌍 LANGUAGE SELECT SWITCH */}
+                <div className="flex items-center gap-1 bg-slate-950/65 border border-slate-800 p-1.5 rounded-2xl shadow-inner shrink-0">
+                  <button
+                    onClick={() => setLanguage('en')}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                      language === 'en'
+                        ? 'bg-slate-700 text-white shadow font-black scale-105'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇺🇸</span>
+                    <span className="hidden xs:inline">EN</span>
+                  </button>
+                  <button
+                    onClick={() => setLanguage('tl')}
+                    className={`px-3 py-1.5 text-[10px] font-black uppercase rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                      language === 'tl'
+                        ? 'bg-indigo-600 text-white shadow font-black scale-105'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇵🇭</span>
+                    <span className="hidden xs:inline">TL</span>
+                  </button>
+                </div>
+
+                <div className="bg-slate-850 hover:bg-slate-800 border border-slate-800 p-2.5 rounded-2xl flex items-center gap-2.5 transition">
+                  <span className="text-2xl bg-slate-900 leading-none p-1 rounded-full shrink-0 select-none shadow-inner">{user.avatar}</span>
+                  <div className="min-w-0 pr-1">
+                    <h5 className="font-black text-xs leading-none text-white truncate max-w-[130px]" title={user.name}>
+                      Mabuhay, {user.name}!
+                    </h5>
+                    <p className="text-[9px] text-slate-400 mt-1 font-semibold truncate max-w-[130px]" title={user.email}>
+                      {user.email}
+                    </p>
+                  </div>
+                  
+                  {/* LOGOUT */}
+                  <button 
+                    onClick={handleLogout}
+                    title="Log-out safe"
+                    id="user-logout-btn"
+                    className="p-1.5 hover:bg-slate-700/60 transition rounded-xl text-slate-400 hover:text-red-400 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </header>
+
+          {/* GIANT COLOR HERO BANNER PANEL */}
+          <div id="hero-marketing-bar" className="bg-slate-900 border-b border-slate-800 py-8 text-white relative overflow-hidden shrink-0">
+            
+            {/* Ambient colorful vector orbs */}
+            <div className="absolute top-0 right-0 h-44 w-44 rounded-full bg-indigo-500/10 blur-3xl" />
+            
+            <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+              
+              {/* DETAILS LEFT */}
+              <div className="space-y-2 text-center md:text-left">
+                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full flex items-center gap-1 w-max mx-auto md:mx-0">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>₱1.00 - ₱5.00 PER SIMULATED HOME VIEW</span>
+                </span>
+                <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
+                  Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
+                </h2>
+                <p className="text-slate-400 text-xs max-w-lg font-semibold">
+                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
+                </p>
+              </div>
+
+              {/* WALLET AND REWARDS CENTER STATUS */}
+              <div className="flex items-center gap-4 self-center md:self-auto">
+                
+                {/* CURRENT BALANCE */}
+                <div className="bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl p-4 min-w-[170px] backdrop-blur-sm transition">
+                  <div className="flex items-center justify-between gap-3 text-blue-200 text-[10px] font-bold uppercase tracking-wider">
+                    <span>Kasalukuyang Balance</span>
+                    <Coins className="w-4 h-4 text-yellow-300 animate-spin-slow" />
+                  </div>
+                  <div className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">
+                    <span className="text-yellow-300 mr-0.5">₱</span>
+                    {stats.balance.toFixed(2)}
+                  </div>
+                  <p className="text-[10px] text-emerald-300 mt-1 font-semibold flex items-center gap-1">
+                    <span>● Ligtas at Pwedeng i-GCash</span>
                   </p>
                 </div>
 
-              </div>
-            )}
+                {/* DAILY CHECK IN ACTION */}
+                <button
+                  id="daily-bonus-checking-btn"
+                  onClick={handleDailyCheckIn}
+                  className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
+                >
+                  <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
+                  <span>₱5.00 Araw Bonus</span>
+                </button>
 
-            {/* TAB 2: CASHOUT SECTION */}
-            {activeTab === 'cashout' && (
-              <div className="animate-fadeIn">
-                <GCashCashout
-                  stats={stats}
-                  withdrawals={withdrawals}
-                  onWithdrawSubmit={handleWithdrawalRequest}
-                />
-              </div>
-            )}
-
-            {/* TAB 3: USER GUIDE (FAQS) */}
-            {activeTab === 'guide' && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6 animate-fadeIn">
-                
-                <div className="flex items-center gap-3 border-b border-slate-150 pb-4">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                    <HelpCircle className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h2 className="font-extrabold text-slate-900 text-lg">Gabay at Patakaran sa Pag-ipon</h2>
-                    <p className="text-xs text-slate-500">Magsimula nang wasto at alamin kung paano kumita gamit ang simulation.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {[
-                    {
-                      q: "1. Paano eksaktong gumagana ang app na ito?",
-                      a: "Ang app na ito ay isang simulator kung paano makakuha ng pera sa pamamagitan ng pagbisita o pag-view sa homepages ng mga kakontratang websites. Ang bawat website listahan ay nagtataglay ng kaukulang reward sa PHP at takdang segundo na kailangang manatili rito upang maingat na ma-verify ang view."
-                    },
-                    {
-                      q: "2. Ano ang Captcha Verification pagkatapos ng countdown?",
-                      a: "Ito ay idinisenyo upang patunayan na ikaw ay isang totoong tao at hindi robotic automated script. Piliin lamang ang tamang larawan (hal. mangga, o pera) na hinihingi ng captcha instruction upang matagumpay na pumasok ang rewards sa iyong active balance."
-                    },
-                    {
-                      q: "3. Gaano kabilis maproseso ang aking GCash withdrawal?",
-                      a: "Napakabilis! Dahil idinisenyo ito bilang isang interactive simulated application, ang iyong withdrawal ay agad na mapupunta sa listahan bilang 'pending'. Ito ay susuriin at magbabagong status bilang 'processing' at kalaunan ay magiging ganap na 'success' na may reference number, na katulad ng totoong proseso ng payout."
-                    },
-                    {
-                      q: "4. Pwede ba akong maglagay ng aking sariling website?",
-                      a: "Oo naman! Naglaan kami ng seksyon na may pamagat na 'Magdagdag ng Iyong Personal na Website'. Dito maaari mong i-paste ang kahit anong custom website homepage link, maglaan ng segundo, at magbibigay ito ng calculated reward base sa haba ng oras ng panonood."
-                    },
-                    {
-                      q: "5. Mayroon bang Limitasyon sa Pag-withdraw?",
-                      a: "Ang naitakdang minimum withdrawal threshold ay nagkakahalaga ng ₱100.00 pesos. Ito ay upang mapanatiling kapaki-pakinabang at maayos ang transportasyong simulated system sa GCash."
-                    }
-                  ].map((faq, idx) => (
-                    <div key={idx} className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl">
-                      <h4 className="font-extrabold text-slate-900 text-sm md:text-base">{faq.q}</h4>
-                      <p className="text-xs md:text-sm text-slate-650 mt-1.5 leading-relaxed">{faq.a}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                  <span className="text-xs font-bold text-blue-800">
-                    💡 Paalaala: Lahat ng transaksyon, pera, at earnings sa application na ito ay bahagi ng isang ligtas na simulator upang maipakita ang mabilis at eleganteng software structure na binuo sa React.
-                  </span>
-                </div>
-
-              </div>
-            )}
-
-          </div>
-
-          {/* QUICK SIDEBAR COLUMNS (RHS - 1 COLUMN) */}
-          <div className="space-y-6">
-            
-            {/* STATS OVERVIEW HEADER CARDS */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-slate-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-                <span>Ang Aking Stats</span>
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Kabuuang Kita</span>
-                  <span className="text-base font-black text-slate-800 mt-1 block">
-                    ₱{stats.lifetimeEarnings.toFixed(2)}
-                  </span>
-                </div>
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">Na-open na Web</span>
-                  <span className="text-base font-black text-slate-800 mt-1 block">
-                    {stats.completedTasksCount} Views
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress target goal bar */}
-              <div className="pt-2">
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold mb-1">
-                  <span>Araw-araw na Target (₱100)</span>
-                  <span>{Math.min(100, Math.floor((stats.balance / 100) * 100))}%</span>
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/50">
-                  <div 
-                    className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (stats.balance / 100) * 100)}%` }}
-                  />
-                </div>
-                <p className="text-[9px] text-slate-400 mt-1 text-center font-medium">May natitira pang ₱{Math.max(0, 100 - stats.balance).toFixed(2)} upang mapunuan.</p>
               </div>
 
             </div>
 
-            {/* 🔗 REFERRALS & INVITE FRIENDS SECTION */}
-            <ReferralPanel
-              stats={stats}
-              onAddReward={handleAddReferralReward}
-              triggerNotification={triggerNotification}
-            />
+          </div>
 
-            {/* LIVE NOTIFICATIONS / AUDIT ACTIVITY LOG */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col max-h-[355px]">
+          {/* 🧭 NAVIGATION TABS CONTROL BAR */}
+          <div id="dashboard-navigation-tabs" className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-4">
               
-              <div className="flex items-center justify-between">
-                <h3 className="font-extrabold text-slate-900 text-xs tracking-wider uppercase flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  <span>Mga Pag-asenso (Activity Logs)</span>
-                </h3>
-                <span className="text-[9px] font-mono text-slate-400 font-bold">Live Feed</span>
+              <div className="flex gap-1 py-3 overflow-x-auto shrink-0">
+                {[
+                  { id: 'earn', label: '🌐 Mag-ipon ng Pera (Website Lists)', icon: Globe },
+                  { id: 'cashout', label: '💳 GCash Cash-Out (Withdraw)', icon: Wallet },
+                  { id: 'guide', label: '📖 Gabay sa Paggamit (FAQs)', icon: HelpCircle },
+                  // Dynamic Admin tab if the session yields an admin role
+                  ...(user.isAdmin ? [{ id: 'admin', label: '👑 Admin Control Panel', icon: Shield }] : [])
+                ].map((tab) => {
+                  const IconComp = tab.icon;
+                  const isSelected = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      id={`nav-tab-${tab.id}`}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-4.5 py-2.5 rounded-xl font-extrabold text-sm transition cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <IconComp className="w-4.5 h-4.5 shrink-0" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Logs loop */}
-              <div className="space-y-3 overflow-y-auto flex-1 pr-1" style={{ maxHeight: '280px' }}>
-                {activityLogs.map((log) => (
-                  <div key={log.id} className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 text-xs space-y-1">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
-                        log.type === 'bonus' 
-                          ? 'bg-amber-100 text-amber-800'
-                          : log.type === 'reward'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-indigo-100 text-indigo-800'
-                      }`}>
-                        {log.type.toUpperCase()}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-mono">{log.timestamp.split(', ')[1] || log.timestamp}</span>
+              <div className="hidden sm:flex items-center gap-1.5 font-mono text-[11px] text-slate-500 font-bold border-l border-slate-200 pl-4 py-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Server Synchronized: Real-Time</span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 🖥️ MAIN BODY WORKSPACE */}
+          <div id="main-content-layout" className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 md:py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+              
+              {/* TAB SHEETS ZONE (LHS - 3 COLUMNS) */}
+              <div className="lg:col-span-3 space-y-6">
+                
+                {/* TAB 1: EARN CONTENT (VISITOR AD BLOCK) */}
+                {activeTab === 'earn' && (
+                  <div className="space-y-6 animate-fadeIn">
+                    
+                    {/* Intro Title */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                      <div>
+                        <h2 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                          <Compass className="w-5 h-5 text-blue-600" />
+                          <span>Mga Pinagtitiwalaang Web Campaigns ngayong araw</span>
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated GCash bonus.</p>
+                      </div>
+                      <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/50 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Naka-ipon ngayon: {stats.completedTasksCount} Website Views</span>
+                      </div>
                     </div>
 
-                    <h5 className="font-bold text-slate-900 leading-snug">{log.title}</h5>
-                    <p className="text-[10px] text-slate-500 leading-normal">{log.details}</p>
+                    {/* Filter and Category toggles */}
+                    <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs font-semibold">
+                      
+                      <div className="flex items-center gap-2">
+                        <ListFilter className="w-4 h-4 text-slate-500" />
+                        <span className="text-slate-500 mr-1.5">Suriin ang Campaigns:</span>
+                        {[
+                          { id: 'all', label: 'Lahat ng Webs' },
+                          { id: 'high', label: 'Mataas ang Kita (≥ ₱1.00)' },
+                          { id: 'available', label: 'Hindi pa Nabibisita' }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            id={`filter-btn-${f.id}`}
+                            onClick={() => setCampaignFilter(f.id as any)}
+                            className={`px-3 py-1.5 rounded-xl border cursor-pointer transition ${
+                              campaignFilter === f.id 
+                                ? 'bg-slate-950 border-slate-950 text-white' 
+                                : 'bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase">
+                        Kabuuang nahanap: {filteredCampaigns.length} available
+                      </span>
+                    </div>
+
+                    {/* WEBSITE GRID CARDS LIST */}
+                    <div id="website-campaigns-grid" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredCampaigns.map((camp) => (
+                        <div 
+                          key={camp.id}
+                          id={`camp-card-${camp.id}`}
+                          className={`bg-white border rounded-2xl p-5 hover:shadow-md transition-all flex flex-col justify-between gap-5 relative overflow-hidden ${
+                            camp.completed 
+                              ? 'border-emerald-250 bg-emerald-50/10' 
+                              : 'border-slate-200'
+                          }`}
+                        >
+                          {/* Top row label and rewards badge */}
+                          <div className="flex justify-between items-start gap-3">
+                            <span className="bg-slate-100 text-slate-600 font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              {camp.category}
+                            </span>
+                            
+                            <span className="bg-emerald-50 border border-emerald-100 text-[12px] font-black text-emerald-700 px-2.5 py-1 rounded-xl">
+                              ₱{camp.reward.toFixed(2)}
+                            </span>
+                          </div>
+
+                          {/* Middle row main title */}
+                          <div className="space-y-1">
+                            <h4 className="font-extrabold text-slate-900 leading-snug line-clamp-2" title={camp.title}>
+                              {camp.title}
+                            </h4>
+                            <p className="text-[10px] text-slate-400 truncate font-mono">{camp.url}</p>
+                          </div>
+
+                          {/* Bottom meta rules & Action triggers */}
+                          <div className="flex items-center justify-between border-t border-slate-100 pt-3.5 mt-1">
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold">
+                              <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span>{camp.timer} segundo</span>
+                            </div>
+
+                            {camp.completed ? (
+                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 animate-fadeIn">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Tagumpay na nakuha!</span>
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenCampaign(camp)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-black px-4 py-2 rounded-xl transition shadow shadow-blue-100 flex items-center gap-1 cursor-pointer hover:scale-[1.03]"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                <span>Buksan Homepage</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {filteredCampaigns.length === 0 && (
+                        <div className="col-span-full bg-white border border-slate-200 rounded-3xl p-10 text-center space-y-2">
+                          <Compass className="w-10 h-10 stroke-1 mx-auto text-slate-350" />
+                          <h4 className="font-extrabold text-slate-800">Walang makitang website campaign.</h4>
+                          <p className="text-xs text-slate-500 max-w-sm mx-auto font-semibold">
+                            Subukang palitan ang list filter o gumawa ng sarili ninyong Website Campaign sa control box sa ibaba!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* INTERACTIVE FORM: CREATE CUSTOM WEBSITE AD CAMPAIGN WITH EARNING RULES */}
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+                      
+                      <div className="border-b border-slate-100 pb-3">
+                        <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                          <PlusCircle className="w-5 h-5 text-indigo-600" />
+                          <span>Mag-add ng Iyong Homepage (Custom Campaigns)</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Ipasok ang link ng iyong website upang mabisita ng simulator at makapamahagi ng balance.</p>
+                      </div>
+
+                      <form onSubmit={handleCreateCustomCampaign} className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold">
+                        
+                        {/* Title input */}
+                        <div className="space-y-1 md:col-span-1">
+                          <label className="text-slate-500 font-bold block">Pangalan ng Website *</label>
+                          <input 
+                            type="text" 
+                            required
+                            placeholder="Hal. My Personal Blog" 
+                            value={customTitle}
+                            onChange={(e) => setCustomTitle(e.target.value)}
+                            className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                          />
+                        </div>
+
+                        {/* URL input */}
+                        <div className="space-y-1 md:col-span-2">
+                          <label className="text-slate-500 font-bold block">Website Homepage URL *</label>
+                          <input 
+                            type="text" 
+                            required
+                            placeholder="Hal. myhomepage.com o blog.org" 
+                            value={customUrl}
+                            onChange={(e) => setCustomUrl(e.target.value)}
+                            className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                          />
+                        </div>
+
+                        {/* Action Submit */}
+                        <div className="flex items-end justify-end">
+                          <button
+                            type="submit"
+                            id="create-custom-campaign-btn"
+                            className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-6 py-2.5 max-h-[38px] rounded-xl cursor-pointer transition flex items-center justify-center gap-1.5"
+                          >
+                            <Plus className="w-4 h-4 text-emerald-400" />
+                            <span>Mag-add Campaign</span>
+                          </button>
+                        </div>
+
+                      </form>
+
+                    </div>
+
+                  </div>
+                )}
+
+                {/* TAB 2: CASHOUT (WITHDRAW GCASH INTEGRATOR) */}
+                {activeTab === 'cashout' && (
+                  <div className="animate-fadeIn">
+                    <GCashCashout 
+                      stats={stats} 
+                      withdrawals={withdrawals} 
+                      onWithdrawSubmit={handleWithdrawalRequest} 
+                      language={language}
+                    />
+                  </div>
+                )}
+
+                {/* TAB 3: FAQ GUIDE */}
+                {activeTab === 'guide' && (
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 animate-fadeIn text-xs leading-relaxed text-slate-600">
                     
-                    <div className="text-right text-[11px] font-black font-mono">
-                      {log.type === 'withdraw' ? (
-                        <span className="text-red-600">-₱{log.amount.toFixed(2)}</span>
+                    <div className="border-b border-slate-150 pb-4">
+                      <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <HelpCircle className="w-5 h-5 text-indigo-600" />
+                        <span>Gabay at FAQs sa Pag-open ng Homepage Simulator</span>
+                      </h2>
+                      <p className="text-slate-400 font-bold mt-1">Dito nakasaad ang detalyadong mekanismo kung paano gumagana ang aming real-time system.</p>
+                    </div>
+
+                    <div className="space-y-4 font-semibold">
+                      
+                      <div className="space-y-1.5 border-b border-slate-100 pb-3">
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 1. Paano ako makaka-ipon ng totoong pera sa app na ito?</h4>
+                        <p>
+                          Ang bawat kumpanya ay nangangailangan ng 'Traffic Value' o pagbisita sa kanilang homepage upang mapataas ang kanilang ranking sa search engines. Binabayaran nila ang simulator upang maikalat ang kanilang Links. Sa pamamagitan ng pagbukas at pananatili sa links nang ilang segundo, nakakatulong ka sa kanilang analytics at binibigyan ka ng gantimpalang pondo.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 border-b border-slate-100 pb-3">
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 2. Pwede ko ba talagang i-withdraw ang naipon ko sa pamamagitan ng GCash?</h4>
+                        <p>
+                          Oo, handog ng interface ang interactive simulated GCash payout workflow! Kapag umabot sa minimum limit na ₱100.00 ang inyong balance, magpunta sa "GCash Cash-Out" tab, ilagay ang iyong GCash details at sumite. Kapag inaprubahan ito ng administrative system sa server, kaagad itong sasalamin sa iyong logs, at sasagutin ng simulated network SMS confirmation!
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 border-b border-slate-100 pb-3">
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 3. Ano ang Admin Panel at sino ang pwedeng mag-access nito?</h4>
+                        <p>
+                          Para makamit ang inyong kahilingan, meron kaming live administrator portal. Ang admin credentials ay asigned kay <strong>Roscodanilo93@gmail.com</strong> na may password na <strong>Titanvpn/10</strong>. Kapag naka-login gamit ito, lilitaw ang karagdagang navigation tab kung saan makikita ang listahan ng lahat ng registered user, ang kanilang holds balance, at kayo ang may ganap na kapangyarihan upang mag-approve (isent sa GCash) o mag-decline (i-refund) ng withdrawals.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5 pb-2">
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 4. Bakit kailangang mag-antay ng "Admin Approval" sa withdrawals?</h4>
+                        <p>
+                          Ito ay para mapigilan ang mga mapagsamantalang gumagamit ng auto-clicker scripts o bots. Ang administrative approval system ay ang opisyal na tagasubaybay ng bawat activity logs bago tuluyang maproseso ang transaksyon papasok sa mock GCash core network.
+                        </p>
+                      </div>
+
+                    </div>
+
+                  </div>
+                )}
+
+                {/* TAB 4: ADVANCED SECURE ADMIN WORKSPACE */}
+                {activeTab === 'admin' && user.isAdmin && (
+                  <div className="animate-fadeIn">
+                    <AdminPanel 
+                      token={token} 
+                      triggerNotification={triggerNotification} 
+                    />
+                  </div>
+                )}
+
+              </div>
+
+              {/* SIDEBAR ZONE (RHS - 1 COLUMN) */}
+              <div className="space-y-6">
+                
+                {/* REFERRAL INVITE PANEL IN SIDEBAR */}
+                <ReferralPanel
+                  referralCode={user.referralCode}
+                  referredFriends={referredFriends}
+                  token={token}
+                  onRefreshProfile={() => fetchUserProfile(token)}
+                  triggerNotification={triggerNotification}
+                  language={language}
+                />
+
+                {/* CORE USER STATUS MOCK WIDGET */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <TrendingUp className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <h4 className="font-extrabold text-slate-900 text-xs tracking-wider uppercase">Live Activity Status</h4>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold leading-tight text-slate-700">
+                    <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                      <span className="text-[9px] text-slate-400 block font-black">Lifetime Profit</span>
+                      <span className="text-emerald-600 font-extrabold text-sm font-mono mt-1 block">
+                        ₱{stats.lifetimeEarnings.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                      <span className="text-[9px] text-slate-400 block font-black">Referred list</span>
+                      <span className="text-red-600 font-extrabold text-sm block mt-1">
+                        {referredFriends.length} invitees
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* MINI INTERNAL AUDIT LIST */}
+                  <div className="space-y-1.5 pt-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-mono text-slate-400 font-bold">Your Recent Activity Logs</span>
+                    </div>
+
+                    <div className="space-y-2 overflow-y-auto max-h-[220px] pr-1">
+                      {activityLogs.map((log) => (
+                        <div key={log.id} className="p-2 bg-slate-50 rounded-xl border border-slate-100 text-[10px] space-y-1">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className={`text-[8px] font-black px-1.5 py-0.2 rounded uppercase ${
+                              log.type === 'bonus' 
+                                ? 'bg-amber-100 text-amber-800'
+                                : log.type === 'reward'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-indigo-100 text-indigo-800'
+                            }`}>
+                              {log.type}
+                            </span>
+                            <span className="text-[8px] text-slate-400 font-mono">
+                              {log.timestamp.includes(',') ? log.timestamp.split(',')[1].trim() : log.timestamp}
+                            </span>
+                          </div>
+
+                          <h5 className="font-extrabold text-slate-900 leading-tight">{log.title}</h5>
+                          <p className="text-slate-500 text-[9px] leading-tight leading-normal">{log.details}</p>
+                          
+                          <div className="text-right text-[10px] font-black font-mono mt-0.5">
+                            {log.type === 'withdraw' ? (
+                              <span className="text-red-600">-₱{log.amount.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-emerald-600">+₱{log.amount.toFixed(2)}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {activityLogs.length === 0 && (
+                        <p className="text-center py-5 italic text-slate-400 text-[10px]">Wala pang naitalang kasanayan.</p>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Simulated SMS Alert Preview screen mock for GCash users */}
+                  <div className="bg-slate-950 text-white rounded-2xl p-4 shadow-xl border border-slate-800 font-mono relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-1">
+                      <div className="h-2 w-2 rounded-full bg-red-400 animate-pulse"></div>
+                    </div>
+                    <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <span>📱 Simulated GCash SMS Monitor</span>
+                    </p>
+                    <div className="border border-slate-800 rounded bg-slate-900 p-2 text-[10px] text-slate-300 leading-relaxed max-h-[140px] overflow-y-auto">
+                      {withdrawals.some(w => w.status === 'success') ? (
+                        <div>
+                          <p className="text-slate-400 text-[8px] font-semibold">Just Now • Globe Network</p>
+                          <p className="text-white mt-1 text-[10px]">
+                            "You have received <strong className="text-emerald-400 font-extrabold">₱{withdrawals.find(w => w.status === 'success')?.amount.toFixed(2)}</strong> of GCash from VisitorRewards on {new Date().toLocaleDateString()}. Ref: {withdrawals.find(w => w.status === 'success')?.referenceNo}."
+                          </p>
+                        </div>
                       ) : (
-                        <span className="text-emerald-600">+₱{log.amount.toFixed(2)}</span>
+                        <p className="text-slate-500 italic text-center py-4">Naghihintay ng matagumpay na simulated withdrawal request...</p>
                       )}
                     </div>
                   </div>
-                ))}
+
+                </div>
+
               </div>
 
             </div>
-
-            {/* Simulated SMS Alert Preview screen mock for GCash users */}
-            <div className="bg-slate-950 text-white rounded-2xl p-4.5 shadow-xl border border-slate-800 font-mono relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-1">
-                <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></div>
-              </div>
-              <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                <span>📱 Simulated GCash SMS Monitor</span>
-              </p>
-              <div className="border border-slate-800 rounded bg-slate-900 p-2 text-[10px] text-slate-300 leading-relaxed max-h-[140px] overflow-y-auto">
-                {withdrawals.some(w => w.status === 'success') ? (
-                  <div>
-                    <p className="text-slate-400 text-[9px]">Just Now • Globe Network</p>
-                    <p className="text-white mt-1">
-                      "You have received <strong className="text-emerald-400 font-extrabold">₱{withdrawals.find(w => w.status === 'success')?.amount.toFixed(2)}</strong> of GCash from VisitorRewards on {new Date().toLocaleDateString()}. Ref: {withdrawals.find(w => w.status === 'success')?.referenceNo}."
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-slate-500 italic text-center py-4">Naghihintay ng matagumpay na simulated withdrawal request...</p>
-                )}
-              </div>
-            </div>
-
           </div>
 
-        </div>
-      </div>
+          {/* 🌐 VIRTUAL BROWSER SIMULATOR CORE IFRAME PORTAL MODAL OVERLAY */}
+          <AnimatePresence>
+            {currentViewingCampaign && (
+              <BrowserSimulator
+                campaign={currentViewingCampaign}
+                onComplete={handleCompleteCampaignView}
+                onClose={() => setCurrentViewingCampaign(null)}
+                language={language}
+              />
+            )}
+          </AnimatePresence>
 
-      {/* 🌐 VIRTUAL BROWSER SIMULATOR CORE IFRAME PORTAL MODAL OVERLAY */}
-      <AnimatePresence>
-        {currentViewingCampaign && (
-          <BrowserSimulator
-            campaign={currentViewingCampaign}
-            onComplete={handleCompleteCampaignView}
-            onClose={() => setCurrentViewingCampaign(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* FOOTER */}
-      <footer id="dashboard-footer" className="bg-white border-t border-slate-200 mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-4 text-center space-y-2">
-          <p className="text-xs font-bold text-slate-500">
-            © 2026 Website Visitor and GCash Rewards Simulation.
-          </p>
-          <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
-          </p>
-        </div>
-      </footer>
+          {/* FOOTER */}
+          <footer id="dashboard-footer" className="bg-white border-t border-slate-200 mt-12 py-6">
+            <div className="max-w-7xl mx-auto px-4 text-center space-y-2 text-xs">
+              <p className="font-bold text-slate-500">
+                © 2026 Website Visitor and GCash Rewards Simulation.
+              </p>
+              <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
+              </p>
+            </div>
+          </footer>
+        </>
+      )}
 
     </div>
   );
