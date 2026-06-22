@@ -659,15 +659,13 @@ export default function App() {
 
               </form>
 
-              {/* DIVIDER 
-              <div className="flex items-center gap-2 pt-2">
+              {/* DIVIDER <div className="flex items-center gap-2 pt-2">
                 <hr className="flex-1 border-slate-850" />
                 <span className="text-[10px] text-slate-500 font-black">OR INTEGRATE WITH</span>
                 <hr className="flex-1 border-slate-850" />
               </div>*/}
 
-              {/* GOOGLE SIGN IN SIMULATION TRIGGER
-              <button
+              {/* GOOGLE SIGN IN SIMULATION TRIGGER <button
                 type="button"
                 onClick={() => setShowGoogleChooser(true)}
                 className="w-full bg-white text-slate-950 hover:bg-slate-100 transition py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
