@@ -215,9 +215,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(5.00);
+        setFloatingCoinReward(0.75);
         setShowConfetti(true);
-        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱0.75 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -798,7 +798,7 @@ export default function App() {
                   className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
                 >
                   <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                  <span>₱5.00 Araw Bonus</span>
+                  <span>₱0.75 Araw Bonus</span>
                 </button>
 
               </div>
