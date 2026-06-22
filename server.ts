@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -59,6 +60,10 @@ interface DBStructure {
 
 // --- HELPER TO INITIALIZE AND GET DATABASE ---
 function loadDB(): DBStructure {
+  const envAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+  const envAdminPassword = process.env.ADMIN_PASSWORD || 'AdminSecurePassword123';
+  const envAdminName = process.env.ADMIN_NAME || 'System Administrator';
+
   // Ensure the src/data directory exists
   const dir = path.dirname(DB_FILE_PATH);
   if (!fs.existsSync(dir)) {
@@ -68,7 +73,15 @@ function loadDB(): DBStructure {
   if (fs.existsSync(DB_FILE_PATH)) {
     try {
       const data = fs.readFileSync(DB_FILE_PATH, 'utf-8');
-      return JSON.parse(data);
+      const loaded: DBStructure = JSON.parse(data);
+      // Synchronize/Update admin credentials dynamically from environment info
+      const admin = loaded.users.find(u => u.isAdmin);
+      if (admin) {
+        admin.email = envAdminEmail;
+        admin.password = envAdminPassword;
+        admin.name = envAdminName;
+      }
+      return loaded;
     } catch (e) {
       console.error('Error reading database file, resetting...', e);
     }
@@ -83,9 +96,9 @@ function loadDB(): DBStructure {
       // 1. Core Admin Account
       {
         id: 'admin-rosco',
-        email: 'Roscodanilo93@gmail.com',
-        password: 'Titanvpn/10',
-        name: 'Admin Rosco',
+        email: envAdminEmail,
+        password: envAdminPassword,
+        name: envAdminName,
         avatar: '👑',
         referralCode: 'ADMIN-ROSCO',
         isAdmin: true,

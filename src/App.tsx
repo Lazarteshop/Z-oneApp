@@ -215,9 +215,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(0.05);
+        setFloatingCoinReward(5.00);
         setShowConfetti(true);
-        triggerNotification('💰 +₱0.05 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -314,7 +314,9 @@ export default function App() {
         triggerNotification(`💸 Sumite ng Cashout (Binubuo)`, 'success');
         return { 
           success: true, 
-          message: `Ang transaksyon ay ipapadala sa iyong GCash number ${gcashNumber}. Ang iyong request ay naghihintay ng Admin Approval.` 
+          message: language === 'tl'
+            ? `Ang transaksyon ay ipapadala sa iyong GCash number ${gcashNumber}. Ang iyong request ay naghihintay ng System Administrator Approval.`
+            : `The transaction will be sent to your GCash number ${gcashNumber}. Your request is pending System Administrator Approval.`
         };
       } else {
         return { success: false, message: result.error || 'Hindi maiproseso.' };
@@ -577,7 +579,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="Hal. Juan Dela Cruz "
+                      placeholder="Hal. Juan Dela Cruz"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
@@ -594,7 +596,7 @@ export default function App() {
                   <input
                     type="email"
                     required
-                    placeholder="Hal. 1234@gmail.com"
+                    placeholder="Hal. juan.delacruz@gmail.com"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
@@ -659,74 +661,16 @@ export default function App() {
 
               </form>
 
-              {/* DIVIDER <div className="flex items-center gap-2 pt-2">
-                <hr className="flex-1 border-slate-850" />
-                <span className="text-[10px] text-slate-500 font-black">OR INTEGRATE WITH</span>
-                <hr className="flex-1 border-slate-850" />
-              </div>*/}
-
-              {/* GOOGLE SIGN IN SIMULATION TRIGGER <button
-                type="button"
-                onClick={() => setShowGoogleChooser(true)}
-                className="w-full bg-white text-slate-950 hover:bg-slate-100 transition py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-              >*/}
-                {/* Custom Google logo <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.12 2.76-2.38 3.6v3h3.84c2.25-2.07 3.68-5.11 3.68-8.43z" />
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.84-3c-1.07.72-2.44 1.16-4.09 1.16-3.15 0-5.81-2.12-6.76-5h-3.97v3.08C3.25 21.84 7.31 24 12 24z" />
-                  <path fill="#FBBC05" d="M5.24 14.25c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3V6.57H1.27C.46 8.2.01 10.05.01 12s.45 3.8 1.26 5.43l3.97-3.18z" />
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.16 1.27 5.73l3.97 3.08c.95-2.88 3.61-5 6.76-5z" />
-                </svg>
-                <span>Google Sign-In at Google Sign-Up</span>
-              </button>
-
-            </div>*/}
-
-            {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW {showGoogleChooser && (
-              <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fadeIn">
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-sm w-full space-y-4">
-                  <div className="text-center">
-                    <span className="text-2xl">👤</span>
-                    <h3 className="font-extrabold text-white text-sm mt-1">Google Accounts Chooser</h3>
-                    <p className="text-[11px] text-slate-400">Pumili ng mock Google Profile upang mag-sign in agad.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    {[
-                      { name: 'danilo rosco', email: 'Roscodanilo93@gmail.com', avatar: '😎' },
-                      { name: 'Juan Dela Cruz', email: 'juan.delacruz@gmail.com', avatar: '👨' },
-                      { name: 'Pinoy Gamer Pro', email: 'pinoy.gamer@gmail.com', avatar: '🎮' },
-                    ].map((account) => (
-                      <button
-                        key={account.email}
-                        onClick={() => handleSimulatedGoogleLogin(account.name, account.email, account.avatar)}
-                        className="w-full bg-slate-850 hover:bg-slate-800 border border-slate-800/60 p-3 rounded-xl flex items-center gap-3 transition text-left cursor-pointer"
-                      >
-                        <span className="text-2xl">{account.avatar}</span>
-                        <div className="min-w-0">
-                          <h4 className="font-extrabold text-white text-xs leading-none">{account.name}</h4>
-                          <p className="text-[10px] text-slate-400 truncate mt-1">{account.email}</p>
-                        </div>
-                        <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded ml-auto">Simulated</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setShowGoogleChooser(false)}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 rounded-xl"
-                  >
-                    I-cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
 
             <p className="text-center text-[10px] text-slate-600 leading-normal max-w-sm mx-auto">
-              Sa pamamagitan ng pag-sign in, sumasang-ayon ka sa interactive simulator guidelines. Ang admin panel ay ma-oopen gamit ang nakalaang Email.
+              {language === 'tl'
+                ? "Sa pamamagitan ng pag-sign in, sumasang-ayon ka sa interactive simulator guidelines."
+                : "By signing in, you agree to the interactive simulator guidelines."}
             </p>
 
           </div>
-        </div>*/}
+        </div>
       ) : (
         /* 📱 GATEWAY 2: AUTHENTICATED SYSTEM DASHBOARD */
         <>
@@ -825,7 +769,7 @@ export default function App() {
                   Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
-                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at kunin ang iyong reward!
+                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
                 </p>
               </div>
 
@@ -1121,19 +1065,23 @@ export default function App() {
                       <div className="space-y-1.5 border-b border-slate-100 pb-3">
                         <h4 className="font-extrabold text-[#0F172A] text-sm">💡 2. Pwede ko ba talagang i-withdraw ang naipon ko sa pamamagitan ng GCash?</h4>
                         <p>
-                          Oo, handog ng interface ang interactive simulated GCash payout workflow! Kapag umabot sa minimum limit na ₱100.00 ang inyong balance, magpunta sa "GCash Cash-Out" tab, ilagay ang iyong GCash details at sumite. Kapag inaprubahan ito ng administrative system sa server, kaagad itong makikita sa iyong logs, at sasagutin din ng simulated network SMS confirmation!
+                          Oo, handog ng interface ang interactive simulated GCash payout workflow! Kapag umabot sa minimum limit na ₱100.00 ang inyong balance, magpunta sa "GCash Cash-Out" tab, ilagay ang iyong GCash details at sumite. Kapag inaprubahan ito ng administrative system sa server, kaagad itong sasalamin sa iyong logs, at sasagutin ng simulated network SMS confirmation!
                         </p>
                       </div>
 
                       <div className="space-y-1.5 border-b border-slate-100 pb-3">
-                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 3. Ano ang helpline Panel at sino ang pwedeng mag-access nito?</h4>
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">
+                          {language === 'tl' ? "💡 3. Paano pinoproseso ang administrative dashboard?" : "💡 3. How is the administrative dashboard processed?"}
+                        </h4>
                         <p>
-                          Para makamit ang inyong kahilingan, meron kaming live administrator portal. Ang admin credentials ay asigned sa <strong>Info.echozone@yahoo.com</strong>. Mag i-mail lamang gamit ito, at pakitandaan. Sytem generated ang may ganap na kapangyarihan upang mag-approve (isent sa GCash) o mag-decline (i-refund) ng withdrawals base sa aksyon at performance ng users.
+                          {language === 'tl' 
+                            ? "Ang bawat rehistradong transaksyon ay ipinapadala sa aming administrative system. Ang mga awtorisadong system administrators lamang ang may ganap na kapangyarihan upang pumasok at mag-suri ng registered users, tignan ang kanilang wallet balance, at mag-approve o mag-decline ng withdrawals nang manu-mano sa server."
+                            : "Every registered transaction is sent to our administrative system. Only authorized system administrators have the permission to enter and review registered users, check wallet balances, and manually approve or decline withdrawals securely on the server."}
                         </p>
                       </div>
 
                       <div className="space-y-1.5 pb-2">
-                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 4. Bakit kailangang mag-antay ng "Approval" sa withdrawals?</h4>
+                        <h4 className="font-extrabold text-[#0F172A] text-sm">💡 4. Bakit kailangang mag-antay ng "Admin Approval" sa withdrawals?</h4>
                         <p>
                           Ito ay para mapigilan ang mga mapagsamantalang gumagamit ng auto-clicker scripts o bots. Ang administrative approval system ay ang opisyal na tagasubaybay ng bawat activity logs bago tuluyang maproseso ang transaksyon papasok sa mock GCash core network.
                         </p>
@@ -1279,10 +1227,10 @@ export default function App() {
           <footer id="dashboard-footer" className="bg-white border-t border-slate-200 mt-12 py-6">
             <div className="max-w-7xl mx-auto px-4 text-center space-y-2 text-xs">
               <p className="font-bold text-slate-500">
-                © 2026 Website Visitor and Z-oneApp Rewards Simulation.
+                © 2026 Website Visitor and GCash Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong sistema. Maaring makaipon ng wasto sa depende sa partisipayon ng myembro ngunit hindi ginagartiya ang agarang benipisyo o rewards.
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
               </p>
             </div>
           </footer>
