@@ -215,9 +215,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(5.00);
+        setFloatingCoinReward(0.05);
         setShowConfetti(true);
-        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱0.05 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -314,7 +314,7 @@ export default function App() {
         triggerNotification(`💸 Sumite ng Cashout (Binubuo)`, 'success');
         return { 
           success: true, 
-          message: `Ang transaksyon ay ipapadala sa iyong GCash number ${gcashNumber}. Ang iyong request ay naghihintay ng Admin (Roscodanilo93@gmail.com) Approval.` 
+          message: `Ang transaksyon ay ipapadala sa iyong GCash number ${gcashNumber}. Ang iyong request ay naghihintay ng Admin Approval.` 
         };
       } else {
         return { success: false, message: result.error || 'Hindi maiproseso.' };
@@ -577,7 +577,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="Hal. Danilo Rosco"
+                      placeholder="Hal. Juan Dela Cruz "
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
@@ -594,7 +594,7 @@ export default function App() {
                   <input
                     type="email"
                     required
-                    placeholder="Hal. Roscodanilo93@gmail.com"
+                    placeholder="Hal. 1234@gmail.com"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 hover:border-slate-700 p-3 rounded-xl outline-none font-bold text-white transition placeholder:font-normal placeholder:text-slate-600"
