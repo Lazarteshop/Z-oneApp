@@ -659,21 +659,20 @@ export default function App() {
 
               </form>
 
-              {/* DIVIDER */}
+              {/* DIVIDER 
               <div className="flex items-center gap-2 pt-2">
                 <hr className="flex-1 border-slate-850" />
                 <span className="text-[10px] text-slate-500 font-black">OR INTEGRATE WITH</span>
                 <hr className="flex-1 border-slate-850" />
-              </div>
+              </div>*/}
 
-              {/* GOOGLE SIGN IN SIMULATION TRIGGER*/}
+              {/* GOOGLE SIGN IN SIMULATION TRIGGER
               <button
                 type="button"
                 onClick={() => setShowGoogleChooser(true)}
                 className="w-full bg-white text-slate-950 hover:bg-slate-100 transition py-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer"
-              >
-                {/* Custom Google logo */}
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
+              >*/}
+                {/* Custom Google logo <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6c-.28 1.5-1.12 2.76-2.38 3.6v3h3.84c2.25-2.07 3.68-5.11 3.68-8.43z" />
                   <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.84-3c-1.07.72-2.44 1.16-4.09 1.16-3.15 0-5.81-2.12-6.76-5h-3.97v3.08C3.25 21.84 7.31 24 12 24z" />
                   <path fill="#FBBC05" d="M5.24 14.25c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3V6.57H1.27C.46 8.2.01 10.05.01 12s.45 3.8 1.26 5.43l3.97-3.18z" />
@@ -682,7 +681,7 @@ export default function App() {
                 <span>Google Sign-In at Google Sign-Up</span>
               </button>
 
-            </div>
+            </div>*/}
 
             {/* MOCK GOOGLE LOGIN ACCOUNT CHOOSER WINDOW {showGoogleChooser && (
               <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 animate-fadeIn">
