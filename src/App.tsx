@@ -965,13 +965,13 @@ export default function App() {
           <div id="dashboard-navigation-tabs" className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 flex items-center justify-between gap-4">
               
-              <div className="flex gap-1 py-3 overflow-x-auto shrink-0">
+              <div className={`w-full grid py-2.5 gap-1 shrink-0 ${user.isAdmin ? 'grid-cols-4' : 'grid-cols-3'} md:flex md:w-auto md:py-3 md:gap-1`}>
                 {[
-                  { id: 'earn', label: '🌐 Mag-ipon ng Pera (Website Lists)', icon: Globe },
-                  { id: 'cashout', label: '💳 GCash Cash-Out (Withdraw)', icon: Wallet },
-                  { id: 'guide', label: '📖 Gabay sa Paggamit (FAQs)', icon: HelpCircle },
+                  { id: 'earn', textMobile: 'Mag-ipon ng Pera', textDesktop: ' (Website Lists)', icon: Globe },
+                  { id: 'cashout', textMobile: 'GCash Cash-Out', textDesktop: ' (Withdraw)', icon: Wallet },
+                  { id: 'guide', textMobile: 'Gabay sa Paggamit', textDesktop: ' (FAQs)', icon: HelpCircle },
                   // Dynamic Admin tab if the session yields an admin role
-                  ...(user.isAdmin ? [{ id: 'admin', label: '👑 Admin Control Panel', icon: Shield }] : [])
+                  ...(user.isAdmin ? [{ id: 'admin', textMobile: 'Admin Control', textDesktop: ' Panel', icon: Shield }] : [])
                 ].map((tab) => {
                   const IconComp = tab.icon;
                   const isSelected = activeTab === tab.id;
@@ -980,14 +980,21 @@ export default function App() {
                       key={tab.id}
                       id={`nav-tab-${tab.id}`}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`px-4.5 py-2.5 rounded-xl font-extrabold text-sm transition cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+                      className={`px-1 py-1.5 sm:px-2 md:px-4.5 md:py-2.5 rounded-xl font-extrabold text-[10px] sm:text-xs md:text-sm transition cursor-pointer flex flex-col md:flex-row items-center justify-center text-center md:text-left gap-1 md:gap-2 leading-tight ${
                         isSelected
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
-                      <IconComp className="w-4.5 h-4.5 shrink-0" />
-                      <span>{tab.label}</span>
+                      <IconComp className="w-4 h-4 md:w-4.5 md:h-4.5 shrink-0" />
+                      <span className="flex flex-col md:flex-row md:items-center gap-0.5 md:gap-1">
+                        <span>{tab.textMobile}</span>
+                        {tab.textDesktop && (
+                          <span className="hidden md:inline text-[10px] md:text-[11px] font-bold opacity-80">
+                            {tab.textDesktop}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
