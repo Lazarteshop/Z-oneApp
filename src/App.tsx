@@ -370,9 +370,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(5.00);
+        setFloatingCoinReward(1.00);
         setShowConfetti(true);
-        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱1.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -549,7 +549,7 @@ export default function App() {
         setCustomReward('0.75');
         setCustomTimer('15');
         setCustomDescription('');
-        triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at panoorin para may mapanalunang ₱${newCampaign.reward.toFixed(2)}.`, 'success');
+        triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at tingan para may makuhang reward ₱${newCampaign.reward.toFixed(2)}.`, 'success');
       } else {
         const errData = await res.json();
         triggerNotification(`⚠️ Bigo sa pagpasa: ${errData.error || 'Server error'}`, 'error');
@@ -969,10 +969,10 @@ export default function App() {
               <div className="space-y-2 text-center md:text-left">
                 <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full flex items-center gap-1 w-max mx-auto md:mx-0">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>₱1.00 - ₱5.00 PER SIMULATED HOME VIEW</span>
+                  <span>₱0.01 - ₱50.00 PER SIMULATED HOME VIEW</span>
                 </span>
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
-                  Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
+                  Kumita ng PPV REWARD sa Simpleng Pagbukas ng Homepage ng mga Website
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
                   Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
@@ -1004,7 +1004,7 @@ export default function App() {
                   className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
                 >
                   <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                  <span>₱5.00 Araw Bonus</span>
+                  <span>₱1.00 Araw Bonus</span>
                 </button>
 
               </div>
@@ -1088,7 +1088,7 @@ export default function App() {
                       <div className="space-y-1">
                         <h3 className="font-extrabold text-slate-900 text-sm">📨 Naghihintay ng Pag-approve ng Admin...</h3>
                         <p className="text-xs text-slate-550 font-bold leading-relaxed">
-                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa GCash ni Admin:
+                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa authorize GCash:
                         </p>
                         <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl mt-2 select-all font-mono font-black text-center text-indigo-700 text-sm tracking-wide">
                           GCASH NO: 0917-000-0000
@@ -1099,10 +1099,10 @@ export default function App() {
                     <div className="bg-amber-50/70 border border-amber-150 rounded-2xl p-4 text-xs font-bold text-amber-900 space-y-2 leading-relaxed">
                       <p>💡 **Para sa mabilis na pagsuri (Review & Testing):**</p>
                       <ul className="list-disc pl-4 space-y-1">
-                        <li>I-click ang **Mag-logout** sa itaas at mag-login gamit ang Admin account upang aprubahan:</li>
-                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">admin@example.com</span></li>
-                        <li>Password: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">AdminSecurePassword123</span></li>
-                        <li>Piliin ang **Subscription Requests** tab sa Admin panel upang i-approve ang iyong account!</li>
+                        <li>I-click ang **Mag-logout** sa itaas or mag message sa   helpline account:</li>
+                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Info.echozone@yahoo.com </span></li>
+                        <li>Facebook: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Z-oneApp</span></li>
+                        <li>******</li>
                       </ul>
                     </div>
 
@@ -1623,7 +1623,7 @@ export default function App() {
                 © 2026 Website Visitor and GCash Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong digital marketing. Ang Z-oneApp ay hindi ginagarantiya ang agarang kita ang bawat reward ay nakadepende sa participation ng users at hindi rich quick scheme.
               </p>
             </div>
           </footer>
