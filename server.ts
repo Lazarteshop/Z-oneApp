@@ -1155,7 +1155,7 @@ app.post('/api/user/daily-checkin', (req, res) => {
     return res.status(400).json({ error: 'Nakuha mo na ang iyong arawang gantimpala para sa araw na ito.' });
   }
 
-  const checkinReward = 10.00;
+  const checkinReward = 1.00;
   user.stats.balance = Number((user.stats.balance + checkinReward).toFixed(2));
   user.stats.lifetimeEarnings = Number((user.stats.lifetimeEarnings + checkinReward).toFixed(2));
   user.stats.dailyCheckInDate = todayStr;
