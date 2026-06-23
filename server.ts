@@ -3,10 +3,11 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
-import { Firestore } from '@google-cloud/firestore';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, doc, getDocs, setDoc } from 'firebase/firestore';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -32,10 +33,8 @@ try {
   console.error('Warning: Failed to load dynamic firebase-applet-config.json, using defaults.', e);
 }
 
-const firestore = new Firestore({
-  projectId: firebaseConfigObj.projectId,
-  databaseId: firebaseConfigObj.firestoreDatabaseId,
-});
+const firebaseApp = initializeApp(firebaseConfigObj);
+const firestore = getFirestore(firebaseApp, firebaseConfigObj.firestoreDatabaseId);
 
 // --- DATABASE TYPES ---
 interface Subscription {
@@ -271,9 +270,9 @@ function saveDB(data: DBStructure) {
 async function uploadToFirestore(data: DBStructure) {
   try {
     const batchPromises = data.users.map(async (u) => {
-      const uDocRef = firestore.collection('users').doc(u.id);
+      const uDocRef = doc(firestore, 'users', u.id);
       const { id, ...uWithoutId } = u;
-      await uDocRef.set(uWithoutId);
+      await setDoc(uDocRef, uWithoutId);
     });
     await Promise.all(batchPromises);
     console.log('☁️ GCash Click-Earn: Firebase Firestore cloud backup completed successfully.');
@@ -294,8 +293,8 @@ async function syncFromFirestore() {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    const usersColRef = firestore.collection('users');
-    const qSnapshot = await usersColRef.get();
+    const usersColRef = collection(firestore, 'users');
+    const qSnapshot = await getDocs(usersColRef);
     
     const dbUsers: any[] = [];
     qSnapshot.forEach((docSnap) => {
@@ -321,9 +320,9 @@ async function syncFromFirestore() {
       
       // Now seed Firestore
       const batchPromises = localDB.users.map(async (u) => {
-        const uDocRef = firestore.collection('users').doc(u.id);
+        const uDocRef = doc(firestore, 'users', u.id);
         const { id, ...uWithoutId } = u;
-        await uDocRef.set(uWithoutId);
+        await setDoc(uDocRef, uWithoutId);
       });
       await Promise.all(batchPromises);
       console.log('✅ Seeding of Firestore complete.');
