@@ -370,9 +370,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(5.00);
+        setFloatingCoinReward(1.00);
         setShowConfetti(true);
-        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱1.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -440,7 +440,7 @@ export default function App() {
           setShowConfetti(false);
         }, 4000);
       } else {
-        triggerNotification(`⚠️ ${result.error || 'Hindi mate-record ang task.'}`, 'error');
+        triggerNotification(`⚠️ ${result.error || 'Hindi mare-record ang task.'}`, 'error');
       }
     } catch (e) {
       console.error(e);
@@ -517,7 +517,7 @@ export default function App() {
       description: customDescription.trim() || 'Isang verified advertiser page para mas palawakin ang iyong simulated earnings.',
       mockPageContent: {
         heroTitle: customTitle.trim(),
-        heroSubtitle: 'Maligayang pagdating sa aming isinadyang simulated ad landing partner. Manatili rito para sa automated GCash rewards!',
+        heroSubtitle: 'Maligayang pagdating sa aming isinadyang simulated ad landing partner. Manatili rito para sa automated PPV rewards!',
         primaryColor: '#1E40AF',
         accentColor: '#10B950',
         paragraphs: [
@@ -732,7 +732,7 @@ export default function App() {
                 G-Click & Earn Homepage
               </h1>
               <p className="text-xs text-slate-400 max-w-sm mx-auto font-semibold">
-                Simulan ang pagbisita sa mga verified web homepage upang makakuha ng automated GCash cashout rewards!
+                Simulan ang pagbisita sa mga verified web homepage upang makakuha ng automated PPV rewards!
               </p>
             </div>
 
@@ -890,7 +890,7 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makatipon ng totoong pera.</p>
+                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makatipon ng totoong PPV rewards.</p>
                 </div>
               </div>
 
@@ -969,13 +969,13 @@ export default function App() {
               <div className="space-y-2 text-center md:text-left">
                 <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full flex items-center gap-1 w-max mx-auto md:mx-0">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>₱1.00 - ₱5.00 PER SIMULATED HOME VIEW</span>
+                  <span>₱0.01 - ₱25.00 PER SIMULATED HOME VIEW</span>
                 </span>
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
-                  Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
+                  Kumita ng PPV rewards sa Simpleng Pagbukas ng Homepage ng mga Website
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
-                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
+                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at kunin ang iyong gantimplang balanse!
                 </p>
               </div>
 
@@ -1004,7 +1004,7 @@ export default function App() {
                   className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
                 >
                   <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                  <span>₱5.00 Araw Bonus</span>
+                  <span>₱1.00 Araw Bonus</span>
                 </button>
 
               </div>
@@ -1071,7 +1071,7 @@ export default function App() {
                     <AlertCircle className="w-8 h-8" />
                   </div>
                   <div className="space-y-1.5">
-                    <h2 className="text-xl font-black text-rose-950">⚠️ Tapos na ang Iyong Akses</h2>
+                    <h2 className="text-xl font-black text-rose-950">⚠️ Tapos na ang Iyong Access</h2>
                     <p className="text-xs text-rose-800 font-bold max-w-md mx-auto">
                       Ang system access para sa iyong account ay kasalukuyang natapos na dahil ang iyong 1-Day Trial o Subscription ay Expired na.
                     </p>
@@ -1086,12 +1086,12 @@ export default function App() {
                         <Clock className="w-6 h-6" />
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-extrabold text-slate-900 text-sm">📨 Naghihintay ng Pag-approve ng Admin...</h3>
+                        <h3 className="font-extrabold text-slate-900 text-sm">📨 Naghihintay ng Pag-approve ng Accounting...</h3>
                         <p className="text-xs text-slate-550 font-bold leading-relaxed">
-                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa GCash ni Admin:
+                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa AUTHORIZE gcash:
                         </p>
                         <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl mt-2 select-all font-mono font-black text-center text-indigo-700 text-sm tracking-wide">
-                          GCASH NO: 0917-000-0000
+                          GCASH NO: 09914089646
                         </div>
                       </div>
                     </div>
@@ -1099,10 +1099,10 @@ export default function App() {
                     <div className="bg-amber-50/70 border border-amber-150 rounded-2xl p-4 text-xs font-bold text-amber-900 space-y-2 leading-relaxed">
                       <p>💡 **Para sa mabilis na pagsuri (Review & Testing):**</p>
                       <ul className="list-disc pl-4 space-y-1">
-                        <li>I-click ang **Mag-logout** sa itaas at mag-login gamit ang Admin account upang aprubahan:</li>
-                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">admin@example.com</span></li>
-                        <li>Password: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">AdminSecurePassword123</span></li>
-                        <li>Piliin ang **Subscription Requests** tab sa Admin panel upang i-approve ang iyong account!</li>
+                        <li>Maaring mag message **thru email** :</li>
+                        <li>Email:<span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Info.echozone@yahoo.com </span></li>
+                        <li>Facebook: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Z-oneApp</span></li>
+                        <li> **Subscription Requests may vary depend on time of submission** !</li>
                       </ul>
                     </div>
 
@@ -1195,7 +1195,7 @@ export default function App() {
                           <Compass className="w-5 h-5 text-blue-600" />
                           <span>Mga Pinagtitiwalaang Web Campaigns ngayong araw</span>
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated GCash bonus.</p>
+                        <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated PPV bonus.</p>
                       </div>
                       <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/50 flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -1211,7 +1211,7 @@ export default function App() {
                         <span className="text-slate-500 mr-1.5">Suriin ang Campaigns:</span>
                         {[
                           { id: 'all', label: 'Lahat ng Webs' },
-                          { id: 'high', label: 'Mataas ang Kita (≥ ₱1.00)' },
+                          { id: 'high', label: 'Mataas ang Kita (≥ ₱0.05)' },
                           { id: 'available', label: 'Hindi pa Nabibisita' }
                         ].map(f => (
                           <button
@@ -1620,10 +1620,10 @@ export default function App() {
           <footer id="dashboard-footer" className="bg-white border-t border-slate-200 mt-12 py-6">
             <div className="max-w-7xl mx-auto px-4 text-center space-y-2 text-xs">
               <p className="font-bold text-slate-500">
-                © 2026 Website Visitor and GCash Rewards Simulation.
+                © 2026 Website Visitor and PPV Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong marketing systen. Ang bawat Pay-per-view rewards ay nakadepende sa participation ng users at walang ginagarantiyang agarang anumang halaga.
               </p>
             </div>
           </footer>
