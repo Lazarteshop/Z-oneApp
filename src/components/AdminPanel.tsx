@@ -16,7 +16,7 @@ import {
   RefreshCw,
   Award
 } from 'lucide-react';
-import { ActivityLog, UserStats, WithdrawalRequest } from '../types';
+import { ActivityLog, UserStats, WithdrawalRequest, Subscription } from '../types';
 
 interface AdminDashboardData {
   users: {
@@ -30,6 +30,8 @@ interface AdminDashboardData {
     referralCode: string;
     referredFriendsCount: number;
     lastActivities: ActivityLog[];
+    createdAt?: string | null;
+    subscription?: Subscription | null;
   }[];
   withdrawals: {
     userId: string;
@@ -53,7 +55,7 @@ export default function AdminPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'withdrawals' | 'users'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'subscriptions' | 'users'>('overview');
 
   // Load dashboard data
   const fetchAdminData = async () => {
@@ -117,6 +119,89 @@ export default function AdminPanel({
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const handleSubscriptionAction = async (userId: string, action: 'approve' | 'decline') => {
+    setProcessingId(userId);
+    try {
+      const res = await fetch(`/api/admin/subscription/${userId}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token
+        }
+      });
+      const result = await res.json();
+      if (res.ok) {
+        triggerNotification(
+          action === 'approve' 
+            ? `🟢 Subscription ay Matagumpay na Inaprubahan!`
+            : `🔴 Subscription ay Tinanggihan!`,
+          action === 'approve' ? 'success' : 'info'
+        );
+        // Refresh dashboard data
+        await fetchAdminData();
+      } else {
+        triggerNotification(`⚠️ ${result.error || 'Hindi maipatupad ang aksyon.'}`, 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Error communicating with server.', 'error');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const getSubscriptionBadgeAndRemaining = (user: any) => {
+    if (user.isAdmin) return { text: 'Admin', className: 'bg-purple-100 text-purple-700 font-extrabold px-2 py-0.5 rounded-full text-[10px]' };
+    
+    // Check trial first
+    const regDate = user.createdAt ? new Date(user.createdAt) : new Date();
+    const passedMs = Date.now() - regDate.getTime();
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+    
+    if (passedMs < oneDayInMs) {
+      const remainingHours = Math.max(0, Math.ceil((oneDayInMs - passedMs) / (60 * 60 * 1005)));
+      return { 
+        text: `Free Trial (${remainingHours} oras natira)`, 
+        className: 'bg-indigo-50 border border-indigo-250 text-indigo-700 font-bold px-2 py-0.5 rounded-full text-[10px]' 
+      };
+    }
+    
+    const sub = user.subscription;
+    if (!sub || sub.status === 'none') {
+      return { 
+        text: 'Expired Trial (Walang Sub)', 
+        className: 'bg-rose-50 border border-rose-200 text-rose-600 font-bold px-2 py-0.5 rounded-full text-[10px]' 
+      };
+    }
+    
+    if (sub.status === 'pending') {
+      return { 
+        text: `Nakabinbin: ${sub.requestedPlanName || 'Subscription'}`, 
+        className: 'bg-amber-50 border border-amber-200 text-amber-700 font-bold px-2 py-0.5 rounded-full text-[10px] animate-pulse' 
+      };
+    }
+    
+    if (sub.status === 'expired') {
+      return { 
+        text: 'Expired Subscription access', 
+        className: 'bg-rose-50 border border-rose-200 text-rose-600 font-bold px-2 py-0.5 rounded-full text-[10px]' 
+      };
+    }
+    
+    if (sub.status === 'active' && sub.expiresAt) {
+      const timeLeftMs = new Date(sub.expiresAt).getTime() - Date.now();
+      const leftDays = Math.max(0, Math.ceil(timeLeftMs / (24 * 60 * 60 * 1000)));
+      return { 
+        text: `Active Premium (${leftDays} araw natira)`, 
+        className: 'bg-emerald-50 border border-emerald-250 text-emerald-700 font-extrabold px-2 py-0.5 rounded-full text-[10px]' 
+      };
+    }
+    
+    return { 
+      text: 'Hindi Aktibo', 
+      className: 'bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px]' 
+    };
   };
 
   if (loading && !data) {
@@ -240,6 +325,21 @@ export default function AdminPanel({
           }`}
         >
           Overview & Queue
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('subscriptions'); }}
+          className={`px-4 py-2 font-black transition-all border-b-2 rounded-t-xl cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'subscriptions'
+              ? 'border-indigo-600 text-indigo-600 bg-white/70'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <span>Subscription Requests</span>
+          {users.filter(u => u.subscription?.status === 'pending').length > 0 && (
+            <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+              {users.filter(u => u.subscription?.status === 'pending').length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => { setActiveSubTab('users'); setSelectedUser(null); }}
@@ -403,6 +503,127 @@ export default function AdminPanel({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* SECTION ATTACHMENT: SUBSCRIPTIONS */}
+      {activeSubTab === 'subscriptions' && (
+        <div className="space-y-6">
+          <div className="bg-slate-50 border border-slate-200/80 p-5 rounded-2xl">
+            <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+              <Shield className="w-5 h-5 text-indigo-600" />
+              <span>Subscription Management Hub</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-bold mt-1">
+              Dito pinoproseso ang mga kahilingan ng mga user upang makagamit ng system base sa kanilang binayarang subscription plan.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* PENDING REQUESTS COLUMN */}
+            <div className="lg:col-span-2 space-y-4">
+              <h4 className="text-xs uppercase font-extrabold text-slate-550 tracking-wider flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-amber-500" />
+                <span>Pending Requests ({users.filter(u => u.subscription?.status === 'pending').length})</span>
+              </h4>
+
+              {users.filter(u => u.subscription?.status === 'pending').length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs font-bold leading-relaxed">
+                  🎉 Walang nakabinbing Subscription Request sa ngayon. Lahat ng hiling ay naproseso na!
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {users.filter(u => u.subscription?.status === 'pending').map((u) => (
+                    <div 
+                      key={u.id}
+                      className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row justify-between gap-4 items-center"
+                    >
+                      <div className="space-y-3 flex-1 w-full">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl bg-orange-50 border border-orange-100 p-2 rounded-full shrink-0">{u.avatar || '👤'}</span>
+                          <div>
+                            <h4 className="font-black text-slate-900 text-xs leading-none">{u.name}</h4>
+                            <p className="text-[10px] text-slate-450 font-bold mt-1.5 font-mono">{u.email}</p>
+                          </div>
+                          
+                          <span className="ml-auto bg-amber-50 border border-amber-200 text-amber-700 font-extrabold px-2.5 py-1 rounded-xl text-xs shrink-0 text-right">
+                            {u.subscription?.requestedPlanName} <span className="block text-[10px] font-black text-amber-600">₱{u.subscription?.requestedAmount}</span>
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-150 text-[10px] space-y-1 text-slate-600 font-bold">
+                          <div className="flex justify-between">
+                            <span>Petsa ng Hiling:</span>
+                            <span className="text-slate-900 font-mono">
+                              {u.subscription?.requestedAt ? new Date(u.subscription.requestedAt).toLocaleString('fil-PH') : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Trial Activation:</span>
+                            <span className="text-slate-900 font-mono">
+                              {u.createdAt ? new Date(u.createdAt).toLocaleDateString('fil-PH') : 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ACTIONS */}
+                      <div className="flex md:flex-col justify-end gap-2 shrink-0 w-full md:w-[150px]">
+                        <button
+                          onClick={() => handleSubscriptionAction(u.id, 'approve')}
+                          disabled={processingId !== null}
+                          className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-extrabold text-[11px] py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-50"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>I-Approve</span>
+                        </button>
+                        <button
+                          onClick={() => handleSubscriptionAction(u.id, 'decline')}
+                          disabled={processingId !== null}
+                          className="flex-1 bg-rose-50 border border-rose-200 hover:bg-rose-100 disabled:opacity-50 text-rose-600 font-extrabold text-[11px] py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>I-Decline</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* LIST OF CURRENT ACCESSIBLE USERS */}
+            <div className="space-y-4">
+              <h4 className="text-xs uppercase font-extrabold text-slate-550 tracking-wider">
+                System Access Registry
+              </h4>
+
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-[480px] overflow-y-auto shadow-xs">
+                {users.map((u) => {
+                  const badge = getSubscriptionBadgeAndRemaining(u);
+                  return (
+                    <div key={u.id} className="p-3.5 flex items-center justify-between text-xs gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base shrink-0">{u.avatar || '👤'}</span>
+                        <div className="min-w-0">
+                          <h5 className="font-extrabold text-slate-800 leading-tight truncate">{u.name}</h5>
+                          <p className="text-[9px] text-slate-450 font-bold mt-0.5 truncate">{u.email}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right shrink-0">
+                        <span className={badge.className}>
+                          {badge.text}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 

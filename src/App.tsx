@@ -108,6 +108,31 @@ export default function App() {
     localStorage.setItem('user_lang', language);
   }, [language]);
 
+  // Dynamically backup active user profile and stats locally to recover transparently after server cold starts/reboots
+  useEffect(() => {
+    if (user) {
+      let savedPassword = '';
+      const existingBackupStr = localStorage.getItem('gcash_user_backup_profile');
+      if (existingBackupStr) {
+        try {
+          const parsed = JSON.parse(existingBackupStr);
+          if (parsed && parsed.password) {
+            savedPassword = parsed.password;
+          }
+        } catch (_) {}
+      }
+
+      if (!savedPassword && passwordInput) {
+        savedPassword = passwordInput;
+      }
+
+      localStorage.setItem('gcash_user_backup_profile', JSON.stringify({
+        ...user,
+        password: savedPassword || (user as any).password
+      }));
+    }
+  }, [user, passwordInput]);
+
   // --- NOTIFICATION BANNER STATE ---
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   
@@ -167,6 +192,47 @@ export default function App() {
           setActiveTab('admin');
         }
       } else {
+        // Token has expired/invalid, or server rebooted on Cloud Run. Try auto-restoring session from offline backup!
+        const backupStr = localStorage.getItem('gcash_user_backup_profile');
+        if (backupStr) {
+          try {
+            const backupProfile = JSON.parse(backupStr);
+            if (backupProfile && backupProfile.email && backupProfile.password && backupProfile.name) {
+              const restoreRes = await fetch('/api/auth/auto-restore', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  email: backupProfile.email,
+                  password: backupProfile.password,
+                  name: backupProfile.name,
+                  avatar: backupProfile.avatar,
+                  stats: backupProfile.stats,
+                  withdrawals: backupProfile.withdrawals,
+                  activityLogs: backupProfile.activityLogs,
+                  referredFriends: backupProfile.referredFriends
+                })
+              });
+              if (restoreRes.ok) {
+                const restoreData = await restoreRes.json();
+                localStorage.setItem('gcash_click_earn_token', restoreData.token);
+                setToken(restoreData.token);
+                setUser(restoreData.user);
+                setStats(restoreData.user.stats);
+                setWithdrawals(restoreData.user.withdrawals);
+                setActivityLogs(restoreData.user.activityLogs);
+                setReferredFriends(restoreData.user.referredFriends);
+                triggerNotification('🔄 Ang iyong session at naipong balance ay ligtas na na-sync muli!', 'success');
+                setLoadingProfile(false);
+                return;
+              }
+            }
+          } catch (restoreErr) {
+            console.error('Failed to auto-restore session from backup:', restoreErr);
+          }
+        }
+
         // Token has expired or is invalid
         handleLogout();
       }
@@ -196,6 +262,85 @@ export default function App() {
     return () => clearInterval(interval);
   }, [token, activeTab]);
 
+  // --- SUBSCRIPTIONS STATE & CALCULATIONS ---
+  const [submittingSubscription, setSubmittingSubscription] = useState(false);
+
+  const isSubscriptionExpired = () => {
+    if (!user) return false;
+    if (user.isAdmin) return false;
+    
+    // Check registration creation date
+    const regDate = user.createdAt ? new Date(user.createdAt) : new Date();
+    const passedMs = Date.now() - regDate.getTime();
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+    
+    // Free trial active if registered less than 24 hours ago
+    if (passedMs < oneDayInMs) {
+      return false; 
+    }
+    
+    // Check active subscription status
+    const sub = user.subscription;
+    if (!sub || sub.status !== 'active') {
+      return true; // Locked out
+    }
+    
+    if (sub.expiresAt) {
+      return new Date(sub.expiresAt).getTime() < Date.now();
+    }
+    
+    return true; // Locked
+  };
+
+  const handleSubscriptionRequest = async (planId: string) => {
+    if (!token) return;
+    setSubmittingSubscription(true);
+    try {
+      const res = await fetch('/api/subscription/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        },
+        body: JSON.stringify({ planId })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setUser(result.user);
+        triggerNotification('📨 Ang iyong Subscription request ay natanggap ng Admin! Mangyaring magdeposito sa GCash.', 'success');
+      } else {
+        triggerNotification(`⚠️ ${result.error || 'Hindi maipadala ang request.'}`, 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Error sa pagkonekta sa server.', 'error');
+    } finally {
+      setSubmittingSubscription(false);
+    }
+  };
+
+  const handleSimulateTrialExpiration = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/user/simulate-expire', {
+        method: 'POST',
+        headers: {
+          'Authorization': token
+        }
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setUser(result.user);
+        triggerNotification('⚡ Kunwari ay natapos na ang iyong 1-Day Trial! Subukan muli ang dashboard.', 'info');
+      } else {
+        triggerNotification(`⚠️ ${result.error || 'Hindi ma-expire ang trial.'}`, 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      triggerNotification('⚠️ Error connecting to server.', 'error');
+    }
+  };
+
   // --- CORE SYSTEM CONTROLLER ACTIONS ---
 
   // 1. Daily Bonus Check-In Hook
@@ -215,9 +360,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(0.75);
+        setFloatingCoinReward(5.00);
         setShowConfetti(true);
-        triggerNotification('💰 +₱0.75 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -734,6 +879,15 @@ export default function App() {
                     <p className="text-[9px] text-slate-400 mt-1 font-semibold truncate max-w-[130px]" title={user.email}>
                       {user.email}
                     </p>
+                    {!user.isAdmin && (
+                      <button
+                        onClick={handleSimulateTrialExpiration}
+                        className="text-[8px] bg-red-650 hover:bg-red-600 hover:scale-105 active:scale-95 text-white font-black py-0.5 px-1.5 rounded-sm mt-1 transition leading-none select-none cursor-pointer"
+                        title="Isimula ang 1-Day Trial Expiration para sa pagsusulit!"
+                      >
+                        ⚡ Sim Expire
+                      </button>
+                    )}
                   </div>
                   
                   {/* LOGOUT */}
@@ -798,7 +952,7 @@ export default function App() {
                   className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
                 >
                   <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                  <span>₱0.75 Araw Bonus</span>
+                  <span>₱5.00 Araw Bonus</span>
                 </button>
 
               </div>
@@ -849,7 +1003,124 @@ export default function App() {
 
           {/* 🖥️ MAIN BODY WORKSPACE */}
           <div id="main-content-layout" className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 md:py-8">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+            {isSubscriptionExpired() ? (
+              <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn py-6">
+                
+                {/* SYSTEM ALERT */}
+                <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 shadow-md text-center space-y-4">
+                  <div className="h-14 w-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto text-rose-600 animate-bounce">
+                    <AlertCircle className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h2 className="text-xl font-black text-rose-950">⚠️ Tapos na ang Iyong Akses</h2>
+                    <p className="text-xs text-rose-800 font-bold max-w-md mx-auto">
+                      Ang system access para sa iyong account ay kasalukuyang natapos na dahil ang iyong 1-Day Trial o Subscription ay Expired na.
+                    </p>
+                  </div>
+                </div>
+
+                {/* IF THE REQUEST IS PENDING */}
+                {user.subscription?.status === 'pending' ? (
+                  <div className="bg-white border-2 border-amber-400 rounded-3xl p-6 shadow-lg space-y-5">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-amber-100 p-3 rounded-2xl shrink-0 text-amber-600 animate-pulse">
+                        <Clock className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-extrabold text-slate-900 text-sm">📨 Naghihintay ng Pag-approve ng Admin...</h3>
+                        <p className="text-xs text-slate-550 font-bold leading-relaxed">
+                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa GCash ni Admin:
+                        </p>
+                        <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl mt-2 select-all font-mono font-black text-center text-indigo-700 text-sm tracking-wide">
+                          GCASH NO: 0917-000-0000
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-50/70 border border-amber-150 rounded-2xl p-4 text-xs font-bold text-amber-900 space-y-2 leading-relaxed">
+                      <p>💡 **Para sa mabilis na pagsuri (Review & Testing):**</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>I-click ang **Mag-logout** sa itaas at mag-login gamit ang Admin account upang aprubahan:</li>
+                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">admin@example.com</span></li>
+                        <li>Password: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">AdminSecurePassword123</span></li>
+                        <li>Piliin ang **Subscription Requests** tab sa Admin panel upang i-approve ang iyong account!</li>
+                      </ul>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => fetchUserProfile(token)}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 transition py-3 rounded-2xl text-slate-950 font-black text-xs cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                      >
+                        <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                        <span>I-refresh ang Status ng Aking Account</span>
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="bg-slate-100 hover:bg-slate-200 transition px-5 py-3 rounded-2xl text-slate-650 font-black text-xs cursor-pointer"
+                      >
+                        Mag-logout
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* SELECTING A SUBSCRIPTION PLAN */
+                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-lg space-y-6">
+                    <div className="text-center space-y-1">
+                      <span className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full select-none">
+                        Mabilisang Pagpipilian (Subscription Plans)
+                      </span>
+                      <h3 className="font-extrabold text-slate-900 text-sm">Pumili ng Subscription Plan Upang Mag-patuloy</h3>
+                      <p className="text-xs text-slate-450 font-semibold max-w-sm mx-auto mt-1">
+                        Kapag napili ang nais na plan, awtomatikong ipadadala ang iyong hiling sa admin queue para sa mabilisang validation.
+                      </p>
+                    </div>
+
+                    {/* PLANS GRID */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {[
+                        { id: '1month', name: '1 Month Access', price: 200, desc: '₱200 para sa 30 araw na tuloy-tuloy na earn at cashouts.' },
+                        { id: '2months', name: '2 Months Access', price: 500, desc: '₱500 para sa 60 araw na pinalawak na access.' },
+                        { id: '3months', name: '3 Months Access', price: 1000, desc: '₱1000 para sa 90 araw na tanyag na VIP access.' },
+                        { id: '4months', name: '4 Months Access', price: 2000, desc: '₱2000 para sa 120 araw ng walang katapusang earning portal.' }
+                      ].map((plan) => (
+                        <div 
+                          key={plan.id}
+                          className="border border-slate-200 rounded-2xl p-4 hover:border-blue-450 hover:shadow-md transition duration-300 flex flex-col justify-between space-y-4"
+                        >
+                          <div className="space-y-1">
+                            <h4 className="font-extrabold text-slate-900 text-xs">{plan.name}</h4>
+                            <div className="text-xl font-bold font-mono text-indigo-650">₱{plan.price}</div>
+                            <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">{plan.desc}</p>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleSubscriptionRequest(plan.id)}
+                            disabled={submittingSubscription}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition py-2 text-white font-black text-xs rounded-xl cursor-pointer shadow-sm text-center"
+                          >
+                            Bilhin ang Plan na ito
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-5 flex items-center justify-between text-xs font-semibold text-slate-500">
+                      <span>Hindi pa handang magbayad?</span>
+                      <button
+                        onClick={handleLogout}
+                        className="text-indigo-650 hover:underline font-black cursor-pointer"
+                      >
+                        I-logout ang aking Account
+                      </button>
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
               
               {/* TAB SHEETS ZONE (LHS - 3 COLUMNS) */}
               <div className="lg:col-span-3 space-y-6">
@@ -1209,6 +1480,7 @@ export default function App() {
               </div>
 
             </div>
+            )}
           </div>
 
           {/* 🌐 VIRTUAL BROWSER SIMULATOR CORE IFRAME PORTAL MODAL OVERLAY */}

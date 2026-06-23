@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
+import { Firestore } from '@google-cloud/firestore';
 
 const app = express();
 const PORT = 3000;
@@ -11,7 +12,42 @@ app.use(express.json());
 
 const DB_FILE_PATH = path.join(process.cwd(), 'src', 'data', 'db.json');
 
+// --- FIREBASE CONFIGURATION & INITIALIZATION ---
+let firebaseConfigObj = {
+  projectId: "feisty-listener-3d2jw",
+  appId: "1:828078909829:web:ce668cbe71588119b33cec",
+  apiKey: "AIzaSyCxS9Nt3GHIfo82RSuDEvzYrdJtpJSFTHk",
+  authDomain: "feisty-listener-3d2jw.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-a97ac6ad-011f-411e-9d04-596438effa7f",
+  storageBucket: "feisty-listener-3d2jw.firebasestorage.app",
+  messagingSenderId: "828078909829"
+};
+
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseConfigObj = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  }
+} catch (e) {
+  console.error('Warning: Failed to load dynamic firebase-applet-config.json, using defaults.', e);
+}
+
+const firestore = new Firestore({
+  projectId: firebaseConfigObj.projectId,
+  databaseId: firebaseConfigObj.firestoreDatabaseId,
+});
+
 // --- DATABASE TYPES ---
+interface Subscription {
+  status: 'none' | 'pending' | 'active' | 'expired';
+  planId: '1month' | '2months' | '3months' | '4months' | null;
+  requestedPlanName?: string | null;
+  requestedAmount?: number | null;
+  requestedAt?: string | null;
+  approvedAt?: string | null;
+  expiresAt?: string | null;
+}
+
 interface UserSession {
   id: string;
   email: string;
@@ -21,6 +57,8 @@ interface UserSession {
   referralCode: string;
   invitedBy?: string; // referralCode of referrer
   isAdmin: boolean;
+  createdAt?: string;
+  subscription?: Subscription;
   stats: {
     balance: number;
     lifetimeEarnings: number;
@@ -225,14 +263,107 @@ function loadDB(): DBStructure {
 
 function saveDB(data: DBStructure) {
   fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  uploadToFirestore(data).catch(err => {
+    console.error('Error uploading db changes to Firestore:', err);
+  });
 }
 
-// Ensure database is initialized
+async function uploadToFirestore(data: DBStructure) {
+  try {
+    const batchPromises = data.users.map(async (u) => {
+      const uDocRef = firestore.collection('users').doc(u.id);
+      const { id, ...uWithoutId } = u;
+      await uDocRef.set(uWithoutId);
+    });
+    await Promise.all(batchPromises);
+    console.log('☁️ GCash Click-Earn: Firebase Firestore cloud backup completed successfully.');
+  } catch (err) {
+    console.error('❌ Failed background write to Firestore:', err);
+  }
+}
+
+async function syncFromFirestore() {
+  try {
+    const envAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+    const envAdminPassword = process.env.ADMIN_PASSWORD || 'AdminSecurePassword123';
+    const envAdminName = process.env.ADMIN_NAME || 'System Administrator';
+
+    // Ensure directory exists
+    const dir = path.dirname(DB_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const usersColRef = firestore.collection('users');
+    const qSnapshot = await usersColRef.get();
+    
+    const dbUsers: any[] = [];
+    qSnapshot.forEach((docSnap) => {
+      dbUsers.push({ id: docSnap.id, ...docSnap.data() });
+    });
+
+    if (dbUsers.length > 0) {
+      console.log(`📱 Found ${dbUsers.length} users in Firestore. Overwriting local cache...`);
+      const loadedDB: DBStructure = { users: dbUsers };
+      
+      // Update/synchronize admin details if needed
+      const admin = loadedDB.users.find(u => u.isAdmin);
+      if (admin) {
+        admin.email = envAdminEmail;
+        admin.password = envAdminPassword;
+        admin.name = envAdminName;
+      }
+      fs.writeFileSync(DB_FILE_PATH, JSON.stringify(loadedDB, null, 2), 'utf-8');
+    } else {
+      console.log('🌱 Firestore cloud database is empty. Seeding defaults from local template...');
+      // Load local database or create a new one using loadDB
+      const localDB = loadDB(); // This creates db.json locally if empty
+      
+      // Now seed Firestore
+      const batchPromises = localDB.users.map(async (u) => {
+        const uDocRef = firestore.collection('users').doc(u.id);
+        const { id, ...uWithoutId } = u;
+        await uDocRef.set(uWithoutId);
+      });
+      await Promise.all(batchPromises);
+      console.log('✅ Seeding of Firestore complete.');
+    }
+  } catch (err) {
+    console.error('⚠️ Could not sync with Firestore at startup. Using local database fallback:', err);
+  }
+}
+
+// Ensure database is initialized (will be updated dynamically during startup sync)
 let database = loadDB();
 
 // --- AUTH MIDDLEWARE ---
 function generateToken(userId: string) {
   return userId; // Simple pass-through for simulation token
+}
+
+function hasActiveAccess(user: UserSession): boolean {
+  if (user.isAdmin) return true;
+  
+  const regDate = user.createdAt ? new Date(user.createdAt) : new Date();
+  const passedMs = Date.now() - regDate.getTime();
+  const oneDayInMs = 24 * 60 * 60 * 1000;
+  
+  // Free trial access for exactly 1 day (24 hours)
+  if (passedMs < oneDayInMs) {
+    return true;
+  }
+  
+  // If registered more than 1 day ago, must have active, unexpired subscription
+  const sub = user.subscription;
+  if (!sub || sub.status !== 'active') {
+    return false;
+  }
+  
+  if (sub.expiresAt) {
+    return new Date(sub.expiresAt).getTime() > Date.now();
+  }
+  
+  return false;
 }
 
 // ============================================
@@ -274,6 +405,15 @@ app.post('/api/auth/register', (req, res) => {
     avatar: defaultAvatar,
     referralCode: myCode,
     isAdmin: false,
+    createdAt: new Date().toISOString(),
+    subscription: {
+      status: 'none',
+      planId: null,
+      requestedPlanName: null,
+      requestedAmount: null,
+      requestedAt: null,
+      expiresAt: null
+    },
     stats: {
       balance: 25.00, // Starting Welcome Bonus
       lifetimeEarnings: 25.00,
@@ -350,6 +490,68 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ user: userSafe, token: generateToken(user.id) });
 });
 
+// AUTO-RESTORE SESSION ENDPOINT
+app.post('/api/auth/auto-restore', (req, res) => {
+  const { email, password, name, avatar, stats, withdrawals, activityLogs, referredFriends } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'Kailangan ibigay ang email, password, at pangalan.' });
+  }
+
+  const db = loadDB();
+  const lowerEmail = email.toLowerCase().trim();
+
+  let user = db.users.find(u => u.email.toLowerCase() === lowerEmail);
+
+  if (!user) {
+    // Re-create and restore the exact profile state from localStorage credentials
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let myCode = 'REF-';
+    for (let i = 0; i < 6; i++) {
+      myCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    user = {
+      id: 'user-restore-' + Date.now(),
+      email: email.trim(),
+      password: password,
+      name: name.trim(),
+      avatar: avatar || '👤',
+      referralCode: myCode,
+      isAdmin: false,
+      createdAt: new Date().toISOString(),
+      subscription: {
+        status: 'none',
+        planId: null,
+        requestedPlanName: null,
+        requestedAmount: null,
+        requestedAt: null,
+        expiresAt: null
+      },
+      stats: stats || {
+        balance: 25.00,
+        lifetimeEarnings: 25.00,
+        completedTasksCount: 0,
+        dailyCheckInDate: null
+      },
+      withdrawals: withdrawals || [],
+      activityLogs: activityLogs || [],
+      referredFriends: referredFriends || []
+    };
+
+    db.users.push(user);
+    saveDB(db);
+  } else {
+    // If user already exists inside current session memory, verify passwords
+    if (user.password !== password) {
+      return res.status(401).json({ error: 'Suriing mabuti ang email at password.' });
+    }
+  }
+
+  const { password: _, ...userSafe } = user as any;
+  res.json({ user: userSafe, token: generateToken(user.id) });
+});
+
 // GOOGLE SIGN IN OR SIGN UP SIMULATION
 app.post('/api/auth/google', (req, res) => {
   const { email, name, avatar, referralCode } = req.body;
@@ -382,6 +584,15 @@ app.post('/api/auth/google', (req, res) => {
       avatar: defaultAvatar,
       referralCode: myCode,
       isAdmin: false,
+      createdAt: new Date().toISOString(),
+      subscription: {
+        status: 'none',
+        planId: null,
+        requestedPlanName: null,
+        requestedAmount: null,
+        requestedAt: null,
+        expiresAt: null
+      },
       stats: {
         balance: 25.00,
         lifetimeEarnings: 25.00,
@@ -448,6 +659,39 @@ app.get('/api/user/profile', (req, res) => {
     return res.status(404).json({ error: 'Hindi mahanap ang gumagamit.' });
   }
 
+  // Check subscription expiration
+  let dbChanged = false;
+  
+  if (!user.createdAt) {
+    user.createdAt = new Date().toISOString();
+    dbChanged = true;
+  }
+  
+  if (!user.subscription) {
+    user.subscription = {
+      status: 'none',
+      planId: null,
+      requestedPlanName: null,
+      requestedAmount: null,
+      requestedAt: null,
+      expiresAt: null
+    };
+    dbChanged = true;
+  } else if (user.subscription.status === 'active' && user.subscription.expiresAt) {
+    if (new Date(user.subscription.expiresAt).getTime() < Date.now()) {
+      user.subscription.status = 'expired';
+      user.activityLogs.unshift({
+        id: 'expire-sub-' + Date.now(),
+        type: 'bonus',
+        title: 'Expired na ang iyong Subscription 🚫',
+        amount: 0,
+        timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
+        details: 'Ang iyong premium subscription access ay natapos na ngayon. Mangyaring pumili muli ng subscription plan upang muling ma-reopen ang iyong dashboard access.'
+      });
+      dbChanged = true;
+    }
+  }
+
   // Update referred friends' progress live in referrer's profile screen
   // By matching referredFriends with their actual current earnings on our DB!
   let isFriendListModified = false;
@@ -465,6 +709,10 @@ app.get('/api/user/profile', (req, res) => {
 
   if (isFriendListModified) {
     user.referredFriends = synchronizedReferredFriends;
+    dbChanged = true;
+  }
+
+  if (dbChanged) {
     saveDB(db);
   }
 
@@ -485,6 +733,10 @@ app.post('/api/user/task-complete', (req, res) => {
   const user = db.users.find(u => u.id === userId);
   if (!user) {
     return res.status(404).json({ error: 'Hindi mahanap ang gumagamit.' });
+  }
+
+  if (!hasActiveAccess(user)) {
+    return res.status(403).json({ error: 'Expired na ang iyong trial o subscription. Mangyaring kumuha ng access plan upang magpatuloy.' });
   }
 
   const reward = Number(rewardAmount);
@@ -546,6 +798,10 @@ app.post('/api/user/claim-referral-bonus', (req, res) => {
     return res.status(404).json({ error: 'Hindi mahanap ang user.' });
   }
 
+  if (!hasActiveAccess(user)) {
+    return res.status(403).json({ error: 'Expired na ang iyong trial o subscription. Mangyaring kumuha ng access plan upang magpatuloy.' });
+  }
+
   const friend = user.referredFriends.find(f => f.id === friendId);
   if (!friend) {
     return res.status(404).json({ error: 'Hindi nakita si friend sa mga invited mo.' });
@@ -605,6 +861,10 @@ app.post('/api/user/withdraw', (req, res) => {
     return res.status(404).json({ error: 'Hindi maiproseso: User not found.' });
   }
 
+  if (!hasActiveAccess(user)) {
+    return res.status(403).json({ error: 'Expired na ang iyong trial o subscription. Mangyaring kumuha ng access plan upang magpatuloy.' });
+  }
+
   if (user.stats.balance < requestedAmount) {
     return res.status(400).json({ error: 'Kulang ang iyong kasalukuyang balanse sa hinihiling na withdrawal.' });
   }
@@ -648,6 +908,10 @@ app.post('/api/user/daily-checkin', (req, res) => {
   const db = loadDB();
   const user = db.users.find(u => u.id === userId);
   if (!user) return res.status(404).json({ error: 'User not found.' });
+
+  if (!hasActiveAccess(user)) {
+    return res.status(403).json({ error: 'Expired na ang iyong trial o subscription. Mangyaring kumuha ng access plan upang magpatuloy.' });
+  }
 
   const todayStr = new Date().toLocaleDateString('fil-PH');
   if (user.stats.dailyCheckInDate === todayStr) {
@@ -702,7 +966,9 @@ app.get('/api/admin/dashboard', (req, res) => {
     withdrawalsCount: u.withdrawals.length,
     referralCode: u.referralCode,
     referredFriendsCount: u.referredFriends.length,
-    lastActivities: u.activityLogs.slice(0, 10) // last 10 activities
+    lastActivities: u.activityLogs.slice(0, 10), // last 10 activities
+    createdAt: u.createdAt || null,
+    subscription: u.subscription || null
   }));
 
   // Gather all withdrawal requests across everyone to manage in one central hub
@@ -917,12 +1183,212 @@ app.post('/api/admin/simulate-friend-earnings', (req, res) => {
 
 
 // ============================================
+//         SUBSCRIPTION ENDPOINTS
+// ============================================
+
+// REQUEST A PLAN
+app.post('/api/subscription/request', (req, res) => {
+  const userId = req.headers.authorization;
+  const { planId } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Mag-login muna.' });
+  }
+
+  const allowedPlans: Record<string, { name: string; amount: number }> = {
+    '1month': { name: '1 Month Access', amount: 200 },
+    '2months': { name: '2 Months Access', amount: 500 },
+    '3months': { name: '3 Months Access', amount: 1000 },
+    '4months': { name: '4 Months Access', amount: 2000 }
+  };
+
+  if (!planId || !allowedPlans[planId]) {
+    return res.status(400).json({ error: 'Maling subscription plan na pinili.' });
+  }
+
+  const db = loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Hindi mahanap ang gumagamit.' });
+  }
+
+  const targetPlan = allowedPlans[planId];
+
+  user.subscription = {
+    status: 'pending',
+    planId: planId,
+    requestedPlanName: targetPlan.name,
+    requestedAmount: targetPlan.amount,
+    requestedAt: new Date().toISOString()
+  };
+
+  user.activityLogs.unshift({
+    id: 'sub-req-' + Date.now(),
+    type: 'bonus',
+    title: 'Nakabinbing Subscription Request ⏳',
+    amount: 0,
+    timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
+    details: `Humiling ka ng access para sa ${targetPlan.name} (₱${targetPlan.amount.toFixed(2)}). Naghihintay ito ng aprubal mula sa Admin.`
+  });
+
+  saveDB(db);
+  const { password: _, ...userSafe } = user as any;
+  res.json({ user: userSafe });
+});
+
+// ADMIN APPROVE SUBSCRIPTION
+app.post('/api/admin/subscription/:userId/approve', (req, res) => {
+  const adminId = req.headers.authorization;
+  const { userId } = req.params;
+
+  if (!adminId) {
+    return res.status(401).json({ error: 'Naka-loob lamang ito sa Admin.' });
+  }
+
+  const db = loadDB();
+  const adminUser = db.users.find(u => u.id === adminId && u.isAdmin);
+  if (!adminUser) {
+    return res.status(403).json({ error: 'Wala kang pahintulot na gawin ito.' });
+  }
+
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Hindi mahanap ang user.' });
+  }
+
+  if (!user.subscription || user.subscription.status !== 'pending') {
+    return res.status(400).json({ error: 'Walang nakabinbing subscription request ang user na ito.' });
+  }
+
+  const planId = user.subscription.planId;
+  let validityDays = 30;
+  if (planId === '2months') validityDays = 60;
+  else if (planId === '3months') validityDays = 90;
+  else if (planId === '4months') validityDays = 120;
+
+  const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+
+  user.subscription = {
+    status: 'active',
+    planId: planId,
+    requestedPlanName: user.subscription.requestedPlanName,
+    requestedAmount: user.subscription.requestedAmount,
+    requestedAt: user.subscription.requestedAt,
+    approvedAt: new Date().toISOString(),
+    expiresAt: expiresAt
+  };
+
+  user.activityLogs.unshift({
+    id: 'sub-app-' + Date.now(),
+    type: 'bonus',
+    title: 'Subscription Activated! 🎉',
+    amount: 0,
+    timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
+    details: `Binuksan ng Admin ang iyong account para sa ${user.subscription.requestedPlanName}. Valid ang access mo hanggang sa ${new Date(expiresAt).toLocaleDateString('fil-PH', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+  });
+
+  saveDB(db);
+  res.json({ success: true, message: `Subscription ay matagumpay na inaprubahan.` });
+});
+
+// ADMIN DECLINE SUBSCRIPTION
+app.post('/api/admin/subscription/:userId/decline', (req, res) => {
+  const adminId = req.headers.authorization;
+  const { userId } = req.params;
+
+  if (!adminId) {
+    return res.status(401).json({ error: 'Naka-loob lamang ito sa Admin.' });
+  }
+
+  const db = loadDB();
+  const adminUser = db.users.find(u => u.id === adminId && u.isAdmin);
+  if (!adminUser) {
+    return res.status(403).json({ error: 'Wala kang pahintulot na gawin ito.' });
+  }
+
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Hindi mahanap ang user.' });
+  }
+
+  if (!user.subscription || user.subscription.status !== 'pending') {
+    return res.status(400).json({ error: 'Walang nakabinbing subscription request ang user na ito.' });
+  }
+
+  const planName = user.subscription.requestedPlanName || 'Subscription';
+
+  user.subscription = {
+    status: 'none',
+    planId: null,
+    requestedPlanName: null,
+    requestedAmount: null,
+    requestedAt: null,
+    expiresAt: null
+  };
+
+  user.activityLogs.unshift({
+    id: 'sub-dec-' + Date.now(),
+    type: 'bonus',
+    title: 'Subscription Rejected ❌',
+    amount: 0,
+    timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
+    details: `Ang iyong hiling para sa ${planName} ay tinanggihan ng admin. Mangyaring i-verify ang iyong de-posito o makipag-ugnayan sa Admin.`
+  });
+
+  saveDB(db);
+  res.json({ success: true, message: `Subscription ay matagumpay na tinanggihan.` });
+});
+
+// SIMULATE TRIAL EXPIRATION FOR QUICK TESTING & DEMONSTRATION
+app.post('/api/user/simulate-expire', (req, res) => {
+  const userId = req.headers.authorization;
+  if (!userId) {
+    return res.status(401).json({ error: 'Mag-login muna.' });
+  }
+
+  const db = loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Hindi mahanap ang user.' });
+  }
+
+  // Set registration date back 2 days so they are past the 1-day free trial limit
+  user.createdAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  // Reset active subscription so they gets trial-expired block
+  user.subscription = {
+    status: 'none',
+    planId: null,
+    requestedPlanName: null,
+    requestedAmount: null,
+    requestedAt: null,
+    expiresAt: null
+  };
+
+  user.activityLogs.unshift({
+    id: 'sim-expire-' + Date.now(),
+    type: 'bonus',
+    title: 'Simulated 1-Day Trial Expiration',
+    amount: 0,
+    timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
+    details: 'Tinapos ang iyong 1-day free trial para sa mabilisang pagsusuri ng subscription features.'
+  });
+
+  saveDB(db);
+  const { password: _, ...userSafe } = user as any;
+  res.json({ user: userSafe });
+});
+
+
+// ============================================
 //            VITE MIDDLEWARE SETUP
 // ============================================
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 async function startServer() {
+  console.log('🔄 Sini-synchronize ang database sa live Cloud Firestore...');
+  await syncFromFirestore();
+
   if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },

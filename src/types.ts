@@ -54,3 +54,13 @@ export interface ReferralFriend {
   joinedAt: string;
 }
 
+export interface Subscription {
+  status: 'none' | 'pending' | 'active' | 'expired';
+  planId: '1month' | '2months' | '3months' | '4months' | null;
+  requestedPlanName?: string | null;
+  requestedAmount?: number | null;
+  requestedAt?: string | null;
+  approvedAt?: string | null;
+  expiresAt?: string | null;
+}
+
