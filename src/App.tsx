@@ -969,7 +969,7 @@ export default function App() {
               <div className="space-y-2 text-center md:text-left">
                 <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full flex items-center gap-1 w-max mx-auto md:mx-0">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>₱0.01 - ₱25.00 PER SIMULATED HOME VIEW</span>
+                  <span>₱0.01-₱25.00 PER SIMULATED HOME VIEW</span>
                 </span>
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
                   Kumita ng PPV rewards sa Simpleng Pagbukas ng Homepage ng mga Website
