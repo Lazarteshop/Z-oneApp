@@ -1,6 +1,6 @@
 {
-  "name": "Website Viewer and GCash Rewards",
-  "description": "Isang masining at ligtas na app upang mag-ipon ng simulated rewards sa pamamagitan ng pag-view ng mga website at mag-withdraw gamit ang GCash.",
+  "name": "Website Viewer and PPV Rewards",
+  "description": "Isang masining at secured na app upang mag-ipon ng simulated PPV rewards sa pamamagitan ng pag-view ng mga website at makapag-withdraw gamit ang GCash.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
