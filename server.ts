@@ -32,23 +32,42 @@ try {
   console.error('Warning: Failed to load dynamic firebase-applet-config.json, using defaults.', e);
 }
 
-const firestoreOptions: any = {
-  projectId: firebaseConfigObj.projectId,
-  databaseId: firebaseConfigObj.firestoreDatabaseId,
-};
+let isFirestoreActive = false;
+let firestore: any = null;
 
-// If deployed on external hosting (like Render.com), they can provide their Google Service Account JSON through this environment variable
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+const hasServiceAccount = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+const isOnGoogleCloud = !!process.env.K_SERVICE || !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+if (hasServiceAccount || isOnGoogleCloud) {
   try {
-    const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    firestoreOptions.credentials = creds;
-    console.log('🗝️ GCP: Loaded credentials from FIREBASE_SERVICE_ACCOUNT env key for external environment.');
-  } catch (err) {
-    console.error('⚠️ GCP: Failed parsing FIREBASE_SERVICE_ACCOUNT env key:', err);
-  }
-}
+    const firestoreOptions: any = {
+      projectId: firebaseConfigObj.projectId,
+      databaseId: firebaseConfigObj.firestoreDatabaseId,
+    };
 
-const firestore = new Firestore(firestoreOptions);
+    if (hasServiceAccount) {
+      try {
+        const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT!);
+        firestoreOptions.credentials = creds;
+        console.log('🗝️ GCP: Loaded credentials from FIREBASE_SERVICE_ACCOUNT env key.');
+      } catch (err) {
+        console.error('⚠️ GCP: Failed parsing FIREBASE_SERVICE_ACCOUNT env key:', err);
+      }
+    }
+
+    firestore = new Firestore(firestoreOptions);
+    isFirestoreActive = true;
+    console.log('☁️ Firestore client initialized successfully.');
+  } catch (err) {
+    console.error('⚠️ Failed to initialize Firestore client. Falling back to local storage:', err);
+    isFirestoreActive = false;
+    firestore = null;
+  }
+} else {
+  console.log('⚠️ No Firebase credentials detected (please configure FIREBASE_SERVICE_ACCOUNT env var on Render.com). Falling back to local db.json storage.');
+  isFirestoreActive = false;
+  firestore = null;
+}
 
 // --- DATABASE TYPES ---
 interface Subscription {
@@ -282,6 +301,9 @@ function saveDB(data: DBStructure) {
 }
 
 async function uploadToFirestore(data: DBStructure) {
+  if (!isFirestoreActive || !firestore) {
+    return;
+  }
   try {
     const batchValues = data.users.map(async (u) => {
       const uDocRef = firestore.collection('users').doc(u.id);
@@ -296,6 +318,10 @@ async function uploadToFirestore(data: DBStructure) {
 }
 
 async function syncFromFirestore() {
+  if (!isFirestoreActive || !firestore) {
+    console.log('ℹ️ Local fallback active: Sini-synchronize ay lalaktawan dahil walang nakitang Firebase credentials.');
+    return;
+  }
   try {
     const envAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
     const envAdminPassword = process.env.ADMIN_PASSWORD || 'AdminSecurePassword123';
