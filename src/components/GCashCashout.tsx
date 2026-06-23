@@ -128,7 +128,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit, lan
           </div>
           <div>
             <h3 className="font-extrabold text-slate-900 text-lg">{isTl ? "GCash Cash-Out Request" : "GCash Cash-Out Request"}</h3>
-            <p className="text-xs text-slate-500">{isTl ? "I-withdraw ang iyong napanalunang totoong premyo rekta sa iyong GCash wallet." : "Withdraw your earned simulated rewards directly to your GCash wallet."}</p>
+            <p className="text-xs text-slate-500">{isTl ? "I-withdraw ang iyong naipong rewards at direktang iproproseso sa iyong GCash wallet." : "Withdraw your earned simulated rewards directly to your GCash wallet."}</p>
           </div>
         </div>
 
@@ -361,7 +361,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit, lan
               <div className="h-full flex flex-col items-center justify-center text-center py-10 text-slate-400">
                 <FileSpreadsheet className="w-10 h-10 stroke-1 mb-2 text-slate-350" />
                 <p className="text-xs font-semibold">{isTl ? "Wala pang naitatalang Withdrawal." : "No withdrawals logged yet."}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{isTl ? "Magsimula ng pagbisita sa homepage ng mga website upang makatipon ng pondo!" : "Start visiting website homepages to accumulate withdrawable balance!"}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{isTl ? "Magsimula ng pagbisita sa homepage ng mga website upang makaipon ng rewards!" : "Start visiting website homepages to accumulate withdrawable balance!"}</p>
               </div>
             ) : (
               [...withdrawals].reverse().map((req) => (
