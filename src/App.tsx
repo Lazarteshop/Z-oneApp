@@ -507,8 +507,8 @@ export default function App() {
       mockPageContent: {
         heroTitle: customTitle.trim(),
         heroSubtitle: 'Maligayang pagdating sa aming isinadyang simulated ad landing partner. Manatili rito para sa automated GCash rewards!',
-        primaryColor: 'from-blue-700 to-indigo-800',
-        accentColor: 'bg-emerald-400 text-slate-900',
+        primaryColor: '#1E40AF',
+        accentColor: '#10B981',
         paragraphs: [
           'Salamat sa pagsuporta at pagbisita sa aming page upang matulungan kaming mai-optimize ang search visibility index.',
           'Ang simulated traffic flow na ito ay ligtas at direktang naka-link sa iyong aktibong user profile account.'
@@ -527,6 +527,8 @@ export default function App() {
 
     setCustomTitle('');
     setCustomUrl('');
+    setCustomReward('0.75');
+    setCustomTimer('15');
     triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at panoorin para may mapanalunang ₱${newCampaign.reward.toFixed(2)}.`, 'success');
   };
 
@@ -605,7 +607,35 @@ export default function App() {
   };
 
   // --- FILTERS LOGIC ---
-  const filteredCampaigns = campaigns.filter((c) => {
+  // Select exactly 3 campaigns deterministically based on today's date for regular users
+  const getDailyCampaigns = (campsList: WebsiteCampaign[]) => {
+    if (user && user.isAdmin) {
+      return campsList; // Admins see all campaigns to manage them
+    }
+    
+    // Choose 3 campaigns deterministically based on today's date (e.g. "2026-06-23")
+    const todayStr = new Date().toISOString().split('T')[0];
+    let hash = 0;
+    for (let i = 0; i < todayStr.length; i++) {
+      hash = todayStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const selected: WebsiteCampaign[] = [];
+    const pool = [...campsList];
+    if (pool.length <= 3) return pool;
+    
+    // Select 3 deterministically
+    for (let j = 0; j < 3; j++) {
+      const idx = Math.abs(hash + j) % pool.length;
+      selected.push(pool[idx]);
+      pool.splice(idx, 1);
+    }
+    return selected;
+  };
+
+  const visibleCampaigns = getDailyCampaigns(campaigns);
+
+  const filteredCampaigns = visibleCampaigns.filter((c) => {
     if (campaignFilter === 'high') return c.reward >= 1.00;
     if (campaignFilter === 'available') return !c.completed;
     return true;
@@ -1243,66 +1273,97 @@ export default function App() {
                           <Compass className="w-10 h-10 stroke-1 mx-auto text-slate-350" />
                           <h4 className="font-extrabold text-slate-800">Walang makitang website campaign.</h4>
                           <p className="text-xs text-slate-500 max-w-sm mx-auto font-semibold">
-                            Subukang palitan ang list filter o gumawa ng sarili ninyong Website Campaign sa control box sa ibaba!
+                            Subukang palitan ang list filter o lumapit sa Administrator para sa mga bagong campaign!
                           </p>
                         </div>
                       )}
                     </div>
 
                     {/* INTERACTIVE FORM: CREATE CUSTOM WEBSITE AD CAMPAIGN WITH EARNING RULES */}
-                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-                      
-                      <div className="border-b border-slate-100 pb-3">
-                        <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                          <PlusCircle className="w-5 h-5 text-indigo-600" />
-                          <span>Mag-add ng Iyong Homepage (Custom Campaigns)</span>
-                        </h3>
-                        <p className="text-[11px] text-slate-500 mt-0.5">Ipasok ang link ng iyong website upang mabisita ng simulator at makapamahagi ng balance.</p>
-                      </div>
-
-                      <form onSubmit={handleCreateCustomCampaign} className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-semibold">
+                    {user && user.isAdmin && (
+                      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
                         
-                        {/* Title input */}
-                        <div className="space-y-1 md:col-span-1">
-                          <label className="text-slate-500 font-bold block">Pangalan ng Website *</label>
-                          <input 
-                            type="text" 
-                            required
-                            placeholder="Hal. My Personal Blog" 
-                            value={customTitle}
-                            onChange={(e) => setCustomTitle(e.target.value)}
-                            className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
-                          />
+                        <div className="border-b border-slate-100 pb-3">
+                          <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                            <PlusCircle className="w-5 h-5 text-indigo-600" />
+                            <span>Mag-add ng Bagong Campaign (Admin Only)</span>
+                          </h3>
+                          <p className="text-[11px] text-slate-550 mt-0.5">Ipasok ang link, reward, at tagal ng pagbisita upang gawing available sa mga users.</p>
                         </div>
 
-                        {/* URL input */}
-                        <div className="space-y-1 md:col-span-2">
-                          <label className="text-slate-500 font-bold block">Website Homepage URL *</label>
-                          <input 
-                            type="text" 
-                            required
-                            placeholder="Hal. myhomepage.com o blog.org" 
-                            value={customUrl}
-                            onChange={(e) => setCustomUrl(e.target.value)}
-                            className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
-                          />
-                        </div>
+                        <form onSubmit={handleCreateCustomCampaign} className="grid grid-cols-1 md:grid-cols-6 gap-4 text-xs font-semibold">
+                          
+                          {/* Title input */}
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-slate-500 font-bold block">Pangalan ng Website / Title *</label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder="Hal. My Personal Blog" 
+                              value={customTitle}
+                              onChange={(e) => setCustomTitle(e.target.value)}
+                              className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                            />
+                          </div>
 
-                        {/* Action Submit */}
-                        <div className="flex items-end justify-end">
-                          <button
-                            type="submit"
-                            id="create-custom-campaign-btn"
-                            className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-6 py-2.5 max-h-[38px] rounded-xl cursor-pointer transition flex items-center justify-center gap-1.5"
-                          >
-                            <Plus className="w-4 h-4 text-emerald-400" />
-                            <span>Mag-add Campaign</span>
-                          </button>
-                        </div>
+                          {/* URL input */}
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-slate-550 font-bold block">Website Homepage URL *</label>
+                            <input 
+                              type="text" 
+                              required
+                              placeholder="Hal. myhomepage.com o blog.org" 
+                              value={customUrl}
+                              onChange={(e) => setCustomUrl(e.target.value)}
+                              className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                            />
+                          </div>
 
-                      </form>
+                          {/* Reward amount */}
+                          <div className="space-y-1 md:col-span-1">
+                            <label className="text-slate-550 font-bold block">Reward (₱) *</label>
+                            <input 
+                              type="number" 
+                              step="0.01"
+                              min="0.01"
+                              required
+                              placeholder="Hal. 2.50" 
+                              value={customReward}
+                              onChange={(e) => setCustomReward(e.target.value)}
+                              className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                            />
+                          </div>
 
-                    </div>
+                          {/* Timer */}
+                          <div className="space-y-1 md:col-span-1">
+                            <label className="text-slate-550 font-bold block">Timer (segundo) *</label>
+                            <input 
+                              type="number" 
+                              min="5"
+                              required
+                              placeholder="Hal. 15" 
+                              value={customTimer}
+                              onChange={(e) => setCustomTimer(e.target.value)}
+                              className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                            />
+                          </div>
+
+                          {/* Action Submit full row */}
+                          <div className="md:col-span-6 flex justify-end">
+                            <button
+                              type="submit"
+                              id="create-custom-campaign-btn"
+                              className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-6 py-2.5 rounded-xl cursor-pointer transition flex items-center justify-center gap-1.5"
+                            >
+                              <Plus className="w-4 h-4 text-emerald-400" />
+                              <span>Mag-add Campaign</span>
+                            </button>
+                          </div>
+
+                        </form>
+
+                      </div>
+                    )}
 
                   </div>
                 )}

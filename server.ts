@@ -35,7 +35,36 @@ try {
 let isFirestoreActive = false;
 let firestore: any = null;
 
-const hasServiceAccount = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+const rawServiceAccountValue = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+let serviceAccountData: any = null;
+
+if (rawServiceAccountValue) {
+  if (rawServiceAccountValue.startsWith('{')) {
+    // Sa tingin natin ito ay raw JSON string
+    try {
+      serviceAccountData = JSON.parse(rawServiceAccountValue);
+      console.log('🗝️ GCP: Na-parse ang raw JSON credentials mula sa FIREBASE_SERVICE_ACCOUNT environment variable.');
+    } catch (err) {
+      console.error('⚠️ GCP: Failed parsing inline JSON from FIREBASE_SERVICE_ACCOUNT. Susubukan nating basahin bilang file path kung ito ay path pala...', err);
+    }
+  }
+  
+  // Kung hindi pa rin na-parse at baka ito ay file path (e.g. Render Secret File)
+  if (!serviceAccountData) {
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(rawServiceAccountValue)) {
+        const fileContent = fs.readFileSync(rawServiceAccountValue, 'utf-8');
+        serviceAccountData = JSON.parse(fileContent);
+        console.log('🗝️ GCP: Matagumpay na nabasa ang credentials mula sa tinuturong file path sa FIREBASE_SERVICE_ACCOUNT:', rawServiceAccountValue);
+      }
+    } catch (err) {
+      console.error('⚠️ GCP: Failed reading service account file from specfied path:', err);
+    }
+  }
+}
+
+const hasServiceAccount = !!serviceAccountData;
 const isOnGoogleCloud = !!process.env.K_SERVICE || !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 if (hasServiceAccount || isOnGoogleCloud) {
@@ -46,13 +75,8 @@ if (hasServiceAccount || isOnGoogleCloud) {
     };
 
     if (hasServiceAccount) {
-      try {
-        const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT!);
-        firestoreOptions.credentials = creds;
-        console.log('🗝️ GCP: Loaded credentials from FIREBASE_SERVICE_ACCOUNT env key.');
-      } catch (err) {
-        console.error('⚠️ GCP: Failed parsing FIREBASE_SERVICE_ACCOUNT env key:', err);
-      }
+      firestoreOptions.credentials = serviceAccountData;
+      console.log('🗝️ GCP: Gagamitin ang nahanap na FIREBASE_SERVICE_ACCOUNT upang kumonekta.');
     }
 
     firestore = new Firestore(firestoreOptions);
