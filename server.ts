@@ -32,10 +32,23 @@ try {
   console.error('Warning: Failed to load dynamic firebase-applet-config.json, using defaults.', e);
 }
 
-const firestore = new Firestore({
+const firestoreOptions: any = {
   projectId: firebaseConfigObj.projectId,
   databaseId: firebaseConfigObj.firestoreDatabaseId,
-});
+};
+
+// If deployed on external hosting (like Render.com), they can provide their Google Service Account JSON through this environment variable
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const creds = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    firestoreOptions.credentials = creds;
+    console.log('🗝️ GCP: Loaded credentials from FIREBASE_SERVICE_ACCOUNT env key for external environment.');
+  } catch (err) {
+    console.error('⚠️ GCP: Failed parsing FIREBASE_SERVICE_ACCOUNT env key:', err);
+  }
+}
+
+const firestore = new Firestore(firestoreOptions);
 
 // --- DATABASE TYPES ---
 interface Subscription {
