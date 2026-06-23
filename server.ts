@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { Firestore } from '@google-cloud/firestore';
+import { INITIAL_CAMPAIGNS } from './src/data/campaigns';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -115,6 +116,7 @@ interface UserSession {
   isAdmin: boolean;
   createdAt?: string;
   subscription?: Subscription;
+  completedCampaignIds?: string[]; // track completed campaigns centrally
   stats: {
     balance: number;
     lifetimeEarnings: number;
@@ -150,6 +152,7 @@ interface UserSession {
 
 interface DBStructure {
   users: UserSession[];
+  campaigns?: any[];
 }
 
 // --- HELPER TO INITIALIZE AND GET DATABASE ---
@@ -174,6 +177,9 @@ function loadDB(): DBStructure {
         admin.email = envAdminEmail;
         admin.password = envAdminPassword;
         admin.name = envAdminName;
+      }
+      if (!loaded.campaigns || loaded.campaigns.length === 0) {
+        loaded.campaigns = INITIAL_CAMPAIGNS;
       }
       return loaded;
     } catch (e) {
@@ -300,7 +306,8 @@ function loadDB(): DBStructure {
         ],
         referredFriends: []
       }
-    ]
+    ],
+    campaigns: INITIAL_CAMPAIGNS
   };
 
   // Add Maria Clara as admin's referred friend at the start
@@ -334,7 +341,17 @@ async function uploadToFirestore(data: DBStructure) {
       const { id, ...uWithoutId } = u;
       await uDocRef.set(uWithoutId);
     });
-    await Promise.all(batchValues);
+
+    let campPromises: Promise<any>[] = [];
+    if (data.campaigns) {
+      campPromises = data.campaigns.map(async (c) => {
+        const cDocRef = firestore.collection('campaigns').doc(c.id);
+        const { id, ...cWithoutId } = c;
+        await cDocRef.set(cWithoutId);
+      });
+    }
+
+    await Promise.all([...batchValues, ...campPromises]);
     console.log('☁️ GCash Click-Earn: Firebase Firestore cloud backup completed successfully.');
   } catch (err) {
     console.error('❌ Failed background write to Firestore:', err);
@@ -365,9 +382,19 @@ async function syncFromFirestore() {
       dbUsers.push({ id: docSnap.id, ...docSnap.data() });
     });
 
+    const campaignsColRef = firestore.collection('campaigns');
+    const cSnapshot = await campaignsColRef.get();
+    const dbCampaigns: any[] = [];
+    cSnapshot.forEach((docSnap) => {
+      dbCampaigns.push({ id: docSnap.id, ...docSnap.data() });
+    });
+
     if (dbUsers.length > 0) {
       console.log(`📱 Found ${dbUsers.length} users in Firestore. Overwriting local cache...`);
-      const loadedDB: DBStructure = { users: dbUsers };
+      const loadedDB: DBStructure = { 
+        users: dbUsers,
+        campaigns: dbCampaigns.length > 0 ? dbCampaigns : INITIAL_CAMPAIGNS
+      };
       
       // Update/synchronize admin details if needed
       const admin = loadedDB.users.find(u => u.isAdmin);
@@ -388,7 +415,17 @@ async function syncFromFirestore() {
         const { id, ...uWithoutId } = u;
         await uDocRef.set(uWithoutId);
       });
-      await Promise.all(batchPromises);
+
+      let seedCampPromises: Promise<any>[] = [];
+      if (localDB.campaigns) {
+        seedCampPromises = localDB.campaigns.map(async (c) => {
+          const cDocRef = firestore.collection('campaigns').doc(c.id);
+          const { id, ...cWithoutId } = c;
+          await cDocRef.set(cWithoutId);
+        });
+      }
+
+      await Promise.all([...batchPromises, ...seedCampPromises]);
       console.log('✅ Seeding of Firestore complete.');
     }
   } catch (err) {
@@ -783,10 +820,138 @@ app.get('/api/user/profile', (req, res) => {
   res.json({ user: userSafe });
 });
 
+// --- CAMPAIGNS ENDPOINTS ---
+app.get('/api/campaigns', (req, res) => {
+  const userId = req.headers.authorization;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthenticated.' });
+  }
+
+  const db = loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const allCampaigns = db.campaigns || INITIAL_CAMPAIGNS;
+
+  if (user.isAdmin) {
+    // Admins see all campaigns to view and manage them
+    return res.json({ campaigns: allCampaigns });
+  }
+
+  // Regular users see exactly 3 random (deterministic per day, per user) campaigns
+  const todayStr = new Date().toISOString().split('T')[0];
+  const selectionSeedStr = `${todayStr}-${user.id}`;
+  
+  // Seeded Random helper function
+  function mulberry32(a: number) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+  }
+
+  let hash = 0;
+  for (let i = 0; i < selectionSeedStr.length; i++) {
+    hash = (hash << 5) - hash + selectionSeedStr.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+
+  const rand = mulberry32(Math.abs(hash));
+  const pool = [...allCampaigns];
+  const selected: any[] = [];
+  const count = Math.min(3, pool.length);
+
+  for (let i = 0; i < count; i++) {
+    const idx = Math.floor(rand() * pool.length);
+    selected.push(pool[idx]);
+    pool.splice(idx, 1);
+  }
+
+  // Mark completion status matching the user's completedCampaignIds array
+  const completedIds = user.completedCampaignIds || [];
+  const campaignsWithStatus = selected.map(c => ({
+    ...c,
+    completed: completedIds.includes(c.id)
+  }));
+
+  res.json({ campaigns: campaignsWithStatus });
+});
+
+app.post('/api/admin/campaigns', (req, res) => {
+  const userId = req.headers.authorization;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthenticated.' });
+  }
+
+  const db = loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: 'Sapat na Admin privileges ay kailangan.' });
+  }
+
+  const { campaign } = req.body;
+  if (!campaign || !campaign.id || !campaign.title || !campaign.url) {
+    return res.status(400).json({ error: 'Invalid campaign body submission.' });
+  }
+
+  if (!db.campaigns) {
+    db.campaigns = INITIAL_CAMPAIGNS;
+  }
+
+  // Add the new custom campaign at the start
+  db.campaigns.unshift(campaign);
+  saveDB(db);
+
+  res.json({ success: true, campaigns: db.campaigns });
+});
+
+app.delete('/api/admin/campaigns/:id', async (req, res) => {
+  const userId = req.headers.authorization;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthenticated.' });
+  }
+
+  const db = loadDB();
+  const user = db.users.find(u => u.id === userId);
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ error: 'Sapat na Admin privileges ay kailangan.' });
+  }
+
+  const campaignId = req.params.id;
+  if (!db.campaigns) {
+    db.campaigns = INITIAL_CAMPAIGNS;
+  }
+
+  const initialLength = db.campaigns.length;
+  db.campaigns = db.campaigns.filter(c => c.id !== campaignId);
+
+  if (db.campaigns.length === initialLength) {
+    return res.status(404).json({ error: 'Hindi mahanap ang campaign.' });
+  }
+
+  saveDB(db);
+
+  // If firestore is active, also delete the document from Firestore campaigns collection
+  if (isFirestoreActive && firestore) {
+    try {
+      await firestore.collection('campaigns').doc(campaignId).delete();
+      console.log(`🗑️ Deleted campaign ${campaignId} from Firestore collection.`);
+    } catch (err) {
+      console.error(`❌ Failed to delete campaign ${campaignId} from Firestore:`, err);
+    }
+  }
+
+  res.json({ success: true, campaigns: db.campaigns });
+});
+
 // COMPLETED TASK REWARD SYNC
 app.post('/api/user/task-complete', (req, res) => {
   const userId = req.headers.authorization;
-  const { rewardAmount, title, details } = req.body;
+  const { campaignId, rewardAmount, title, details } = req.body;
 
   if (!userId) {
     return res.status(401).json({ error: 'Unauthenticated Request.' });
@@ -806,6 +971,15 @@ app.post('/api/user/task-complete', (req, res) => {
   user.stats.balance = Number((user.stats.balance + reward).toFixed(2));
   user.stats.lifetimeEarnings = Number((user.stats.lifetimeEarnings + reward).toFixed(2));
   user.stats.completedTasksCount += 1;
+
+  if (campaignId) {
+    if (!user.completedCampaignIds) {
+      user.completedCampaignIds = [];
+    }
+    if (!user.completedCampaignIds.includes(campaignId)) {
+      user.completedCampaignIds.push(campaignId);
+    }
+  }
 
   // Record logs
   user.activityLogs.unshift({

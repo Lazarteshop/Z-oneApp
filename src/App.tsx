@@ -36,7 +36,8 @@ import {
   LogOut,
   RefreshCw,
   Shield,
-  Award
+  Award,
+  Trash2
 } from 'lucide-react';
 import { INITIAL_CAMPAIGNS } from './data/campaigns';
 import { WebsiteCampaign, WithdrawalRequest, ActivityLog, UserStats, ReferralFriend } from './types';
@@ -95,6 +96,7 @@ export default function App() {
   const [customUrl, setCustomUrl] = useState('');
   const [customReward, setCustomReward] = useState('0.75');
   const [customTimer, setCustomTimer] = useState('15');
+  const [customDescription, setCustomDescription] = useState('');
   const [campaignFilter, setCampaignFilter] = useState<'all' | 'high' | 'available'>('all');
 
   // Animation states
@@ -173,18 +175,26 @@ export default function App() {
         setActivityLogs(data.user.activityLogs);
         setReferredFriends(data.user.referredFriends);
         
-        // Load custom or default campaigns
-        const localC = localStorage.getItem('gcash_click_earn_campaigns');
-        if (localC) {
-          setCampaigns(JSON.parse(localC));
-        } else {
-          // Initialize with default tasks and mark those existing in user completion
+        // Load campaigns directly from our centralized cloud backend
+        try {
+          const campRes = await fetch('/api/campaigns', {
+            headers: {
+              'Authorization': authToken
+            }
+          });
+          if (campRes.ok) {
+            const campData = await campRes.json();
+            setCampaigns(campData.campaigns);
+          } else {
+            throw new Error('Failed to fetch from /api/campaigns');
+          }
+        } catch (cErr) {
+          console.error('Error fetching campaigns from backend, using fallback:', cErr);
           const mapped = INITIAL_CAMPAIGNS.map(c => ({
             ...c,
             completed: data.user.activityLogs.some((l: any) => l.type === 'reward' && l.title.includes(c.title))
           }));
           setCampaigns(mapped);
-          localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(mapped));
         }
 
         // Auto transition into admin panel tab if they are logged in as admin to save steps
@@ -307,7 +317,7 @@ export default function App() {
       const result = await res.json();
       if (res.ok) {
         setUser(result.user);
-        triggerNotification('📨 Ang iyong Subscription request ay natanggap ng accounting department! Mangyaring magdeposito para sa iyong subscription.', 'success');
+        triggerNotification('📨 Ang iyong Subscription request ay natanggap ng Admin! Mangyaring magdeposito sa GCash.', 'success');
       } else {
         triggerNotification(`⚠️ ${result.error || 'Hindi maipadala ang request.'}`, 'error');
       }
@@ -360,9 +370,9 @@ export default function App() {
         setActivityLogs(result.user.activityLogs);
         
         // Show visual coin rewards
-        setFloatingCoinReward(0.50);
+        setFloatingCoinReward(5.00);
         setShowConfetti(true);
-        triggerNotification('💰 +₱0.50 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
+        triggerNotification('💰 +₱5.00 Instant GCash Bonus idinagdag sa iyong Wallet!', 'success');
         setTimeout(() => {
           setFloatingCoinReward(null);
           setShowConfetti(false);
@@ -396,6 +406,7 @@ export default function App() {
           'Authorization': token
         },
         body: JSON.stringify({
+          campaignId: id,
           rewardAmount: reward,
           title: `Natapos panoorin ang ${label}`,
           details: `Salamat sa pag-open at pananatili sa homepage ng ${label} nang ${matchCampaign?.timer || 10} segundo.`
@@ -473,7 +484,7 @@ export default function App() {
   };
 
   // 5. Add Custom Website Campaign
-  const handleCreateCustomCampaign = (e: React.FormEvent) => {
+  const handleCreateCustomCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!customTitle.trim()) {
@@ -503,12 +514,12 @@ export default function App() {
       completed: false,
       logo: 'Globe',
       category: 'E-Services',
-      description: 'Isang verified advertiser page para mas palawakin ang iyong simulated earnings.',
+      description: customDescription.trim() || 'Isang verified advertiser page para mas palawakin ang iyong simulated earnings.',
       mockPageContent: {
         heroTitle: customTitle.trim(),
         heroSubtitle: 'Maligayang pagdating sa aming isinadyang simulated ad landing partner. Manatili rito para sa automated GCash rewards!',
         primaryColor: '#1E40AF',
-        accentColor: '#10B981',
+        accentColor: '#10B950',
         paragraphs: [
           'Salamat sa pagsuporta at pagbisita sa aming page upang matulungan kaming mai-optimize ang search visibility index.',
           'Ang simulated traffic flow na ito ay ligtas at direktang naka-link sa iyong aktibong user profile account.'
@@ -521,15 +532,54 @@ export default function App() {
       }
     };
 
-    const updated = [newCampaign, ...campaigns];
-    setCampaigns(updated);
-    localStorage.setItem('gcash_click_earn_campaigns', JSON.stringify(updated));
+    try {
+      const res = await fetch('/api/admin/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token || ''
+        },
+        body: JSON.stringify({ campaign: newCampaign })
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setCampaigns(result.campaigns);
+        setCustomTitle('');
+        setCustomUrl('');
+        setCustomReward('0.75');
+        setCustomTimer('15');
+        setCustomDescription('');
+        triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at panoorin para may mapanalunang ₱${newCampaign.reward.toFixed(2)}.`, 'success');
+      } else {
+        const errData = await res.json();
+        triggerNotification(`⚠️ Bigo sa pagpasa: ${errData.error || 'Server error'}`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerNotification('⚠️ Connection error sa server.', 'error');
+    }
+  };
 
-    setCustomTitle('');
-    setCustomUrl('');
-    setCustomReward('0.75');
-    setCustomTimer('15');
-    triggerNotification(`💡 Tagumpay na naidagdag ang "${newCampaign.title}"! Puwede na itong buksan at tignang muli para may makuhang reward ₱${newCampaign.reward.toFixed(2)}.`, 'success');
+  const handleDeleteCampaign = async (campaignId: string, campaignTitle: string) => {
+    try {
+      const res = await fetch(`/api/admin/campaigns/${campaignId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token || ''
+        }
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setCampaigns(result.campaigns);
+        triggerNotification(`🗑️ Tagumpay na tinanggal ang campaign: "${campaignTitle}"`, 'success');
+      } else {
+        const errData = await res.json();
+        triggerNotification(`⚠️ Bigo sa pagtanggal: ${errData.error || 'Server error'}`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerNotification('⚠️ Connection error sa server.', 'error');
+    }
   };
 
   // --- AUTHENTICATION INTERFACE HANDLERS ---
@@ -607,35 +657,7 @@ export default function App() {
   };
 
   // --- FILTERS LOGIC ---
-  // Select exactly 3 campaigns deterministically based on today's date for regular users
-  const getDailyCampaigns = (campsList: WebsiteCampaign[]) => {
-    if (user && user.isAdmin) {
-      return campsList; // Admins see all campaigns to manage them
-    }
-    
-    // Choose 3 campaigns deterministically based on today's date (e.g. "2026-06-23")
-    const todayStr = new Date().toISOString().split('T')[0];
-    let hash = 0;
-    for (let i = 0; i < todayStr.length; i++) {
-      hash = todayStr.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    const selected: WebsiteCampaign[] = [];
-    const pool = [...campsList];
-    if (pool.length <= 3) return pool;
-    
-    // Select 3 deterministically
-    for (let j = 0; j < 3; j++) {
-      const idx = Math.abs(hash + j) % pool.length;
-      selected.push(pool[idx]);
-      pool.splice(idx, 1);
-    }
-    return selected;
-  };
-
-  const visibleCampaigns = getDailyCampaigns(campaigns);
-
-  const filteredCampaigns = visibleCampaigns.filter((c) => {
+  const filteredCampaigns = campaigns.filter((c) => {
     if (campaignFilter === 'high') return c.reward >= 1.00;
     if (campaignFilter === 'available') return !c.completed;
     return true;
@@ -710,7 +732,7 @@ export default function App() {
                 G-Click & Earn Homepage
               </h1>
               <p className="text-xs text-slate-400 max-w-sm mx-auto font-semibold">
-                Simulan ang pagbisita sa mga verified web homepage upang makakuha ng automated rewards at makaipon araw-araw!
+                Simulan ang pagbisita sa mga verified web homepage upang makakuha ng automated GCash cashout rewards!
               </p>
             </div>
 
@@ -868,7 +890,7 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makaipon ng rewards araw-araw.</p>
+                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makatipon ng totoong pera.</p>
                 </div>
               </div>
 
@@ -950,10 +972,10 @@ export default function App() {
                   <span>₱1.00 - ₱5.00 PER SIMULATED HOME VIEW</span>
                 </span>
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
-                  Kumita ng participation rewards sa Simpleng Pagbukas ng Homepage ng aming mga kliyente
+                  Kumita ng GCash sa Simpleng Pagbukas ng Homepage ng mga Website
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
-                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo at hintaying matapos ang automatic browser timer, at kunin ang iyong reward!
+                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo habang natatapos ang automatic browser timer, at pitasin ang iyong gantimplang balanse!
                 </p>
               </div>
 
@@ -982,7 +1004,7 @@ export default function App() {
                   className="bg-gradient-to-b from-yellow-300 to-amber-500 hover:from-yellow-200 hover:to-amber-450 text-slate-950 font-black px-5 py-3 rounded-2xl h-full shadow-md text-sm transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex flex-col items-center justify-center gap-1 shrink-0"
                 >
                   <Sparkles className="w-5 h-5 text-yellow-950 animate-pulse" />
-                  <span>₱0.01-5 Araw Bonus</span>
+                  <span>₱5.00 Araw Bonus</span>
                 </button>
 
               </div>
@@ -1066,10 +1088,10 @@ export default function App() {
                       <div className="space-y-1">
                         <h3 className="font-extrabold text-slate-900 text-sm">📨 Naghihintay ng Pag-approve ng Admin...</h3>
                         <p className="text-xs text-slate-550 font-bold leading-relaxed">
-                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa aming authorize GCash #:
+                          Hiniling mo ang <span className="text-indigo-600 font-black">{user.subscription.requestedPlanName}</span>. Mangyaring magdeposito ng halagang <span className="text-emerald-600 font-black">₱{user.subscription.requestedAmount}</span> sa GCash ni Admin:
                         </p>
                         <div className="bg-slate-50 border border-slate-150 p-3 rounded-2xl mt-2 select-all font-mono font-black text-center text-indigo-700 text-sm tracking-wide">
-                          GCASH NO: 09914089646
+                          GCASH NO: 0917-000-0000
                         </div>
                       </div>
                     </div>
@@ -1077,10 +1099,10 @@ export default function App() {
                     <div className="bg-amber-50/70 border border-amber-150 rounded-2xl p-4 text-xs font-bold text-amber-900 space-y-2 leading-relaxed">
                       <p>💡 **Para sa mabilis na pagsuri (Review & Testing):**</p>
                       <ul className="list-disc pl-4 space-y-1">
-                        <li>I-click ang **Mag-logout** sa itaas at mag-login mukli gamit ang iyong account upang marefresh ang server or mag emal sa:</li>
-                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Lazarteanthonel@yahoo.com </span></li>
-                        <li>Facebook:<span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">Z-oneApp</span></li>
-                        <li>Ang facebook page na ito ay **version 1.0** meaning bago pa lamang para sa aming mga myembro</li>
+                        <li>I-click ang **Mag-logout** sa itaas at mag-login gamit ang Admin account upang aprubahan:</li>
+                        <li>Email: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">admin@example.com</span></li>
+                        <li>Password: <span className="font-mono bg-white px-1 py-0.2 rounded border select-all font-bold text-slate-800">AdminSecurePassword123</span></li>
+                        <li>Piliin ang **Subscription Requests** tab sa Admin panel upang i-approve ang iyong account!</li>
                       </ul>
                     </div>
 
@@ -1173,7 +1195,7 @@ export default function App() {
                           <Compass className="w-5 h-5 text-blue-600" />
                           <span>Mga Pinagtitiwalaang Web Campaigns ngayong araw</span>
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated bonus or reward.</p>
+                        <p className="text-xs text-slate-500 mt-1">Mag-click at manatili sa target homepage para makuha ang automated GCash bonus.</p>
                       </div>
                       <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/50 flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -1226,9 +1248,23 @@ export default function App() {
                         >
                           {/* Top row label and rewards badge */}
                           <div className="flex justify-between items-start gap-3">
-                            <span className="bg-slate-100 text-slate-600 font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                              {camp.category}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="bg-slate-100 text-slate-600 font-bold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                {camp.category}
+                              </span>
+                              {user && user.isAdmin && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCampaign(camp.id, camp.title);
+                                  }}
+                                  title="Tanggalin/Burahin ang Campaign"
+                                  className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/55 p-1 rounded-lg transition duration-200 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                             
                             <span className="bg-emerald-50 border border-emerald-100 text-[12px] font-black text-emerald-700 px-2.5 py-1 rounded-xl">
                               ₱{camp.reward.toFixed(2)}
@@ -1236,11 +1272,16 @@ export default function App() {
                           </div>
 
                           {/* Middle row main title */}
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <h4 className="font-extrabold text-slate-900 leading-snug line-clamp-2" title={camp.title}>
                               {camp.title}
                             </h4>
                             <p className="text-[10px] text-slate-400 truncate font-mono">{camp.url}</p>
+                            {camp.description && (
+                              <p className="text-[11px] text-slate-500 font-semibold leading-relaxed mt-1 line-clamp-2" title={camp.description}>
+                                {camp.description}
+                              </p>
+                            )}
                           </div>
 
                           {/* Bottom meta rules & Action triggers */}
@@ -1345,6 +1386,18 @@ export default function App() {
                               value={customTimer}
                               onChange={(e) => setCustomTimer(e.target.value)}
                               className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition"
+                            />
+                          </div>
+
+                          {/* Description input */}
+                          <div className="space-y-1 md:col-span-6">
+                            <label className="text-slate-550 font-bold block">Paglalarawan / Description of Website</label>
+                            <textarea 
+                              placeholder="Hal. Isang mahusay na blog tungkol sa tech at balita sa bansa." 
+                              value={customDescription}
+                              onChange={(e) => setCustomDescription(e.target.value)}
+                              rows={2}
+                              className="w-full bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-hidden font-semibold transition resize-none"
                             />
                           </div>
 
@@ -1527,7 +1580,7 @@ export default function App() {
                       <div className="h-2 w-2 rounded-full bg-red-400 animate-pulse"></div>
                     </div>
                     <p className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                      <span>📱 Simulated  SMS Monitor</span>
+                      <span>📱 Simulated GCash SMS Monitor</span>
                     </p>
                     <div className="border border-slate-800 rounded bg-slate-900 p-2 text-[10px] text-slate-300 leading-relaxed max-h-[140px] overflow-y-auto">
                       {withdrawals.some(w => w.status === 'success') ? (
@@ -1570,7 +1623,7 @@ export default function App() {
                 © 2026 Website Visitor and GCash Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa digital industry. Ang platform na ito ay walang gingarantiyang agarang halaga ng salapi dahil ang rewards ay nakabase sa participation ng bawat users.
+                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong React techniques. Walang tunay na bank accounts o GCash integrated APIs ang pwedeng mawalan o maubusan ng totoong pondo.
               </p>
             </div>
           </footer>
