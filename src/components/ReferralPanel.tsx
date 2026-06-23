@@ -237,7 +237,7 @@ export default function ReferralPanel({
                   {/* Friend progress details */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-[9px] text-slate-500 font-bold">
-                      <span>{isTl ? `Simulated Earnings: ₱${friend.currentEarnings.toFixed(2)}` : `Simulated Earnings: ₱${friend.currentEarnings.toFixed(2)}`}</span>
+                      <span>{isTl ? `Kasalukuyang Kita: ₱${friend.currentEarnings.toFixed(2)}` : `Live Earnings: ₱${friend.currentEarnings.toFixed(2)}`}</span>
                       <span>{progressPct}%</span>
                     </div>
                     
@@ -251,23 +251,6 @@ export default function ReferralPanel({
                       />
                     </div>
                   </div>
-
-                  {/* Sandbox helper inside card to simulate earnings increase */}
-                  {!isEligible && (
-                    <div className="flex gap-1.5 pt-1 border-t border-slate-100 justify-end">
-                      <button
-                        onClick={() => simulateFriendEarnings(friend.id)}
-                        disabled={simulating !== null}
-                        className="text-[8px] bg-white border border-slate-250 font-black px-1.5 py-0.5 rounded text-slate-700 hover:bg-slate-100 transition cursor-pointer flex items-center gap-0.5"
-                      >
-                        {simulating === friend.id ? (
-                          <RefreshCw className="w-2 h-2 animate-spin text-slate-600" />
-                        ) : (
-                          <span>{isTl ? "+₱150 Kita" : "+₱150 Income"}</span>
-                        )}
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -275,22 +258,13 @@ export default function ReferralPanel({
         )}
       </div>
 
-      {/* SIMULATOR SANDBOX CONTROLLER */}
+      {/* AUTOMATED REAL-TIME INFO HELPER */}
       {token && (
         <div className="pt-2 border-t border-slate-150">
-          <button
-            id="simulate-invite-friend-btn"
-            onClick={simulateInviteFriend}
-            disabled={simulating !== null}
-            className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-extrabold text-[10px] py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow py-2.5"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
-            <span>{isTl ? "I-simulate ang Pag-invite ng Kaibigan (Test)" : "Simulate Friend Invite (Sandbox)"}</span>
-          </button>
-          <p className="text-[9px] text-slate-400 mt-1.5 text-center select-none leading-relaxed font-semibold">
+          <p className="text-[9px] text-indigo-500 text-center select-none leading-relaxed font-semibold">
             {isTl 
-              ? "💡 Mag-invite ng mock user na naka-save sa database para makita ang syncing at claim milestones feature!" 
-              : "💡 Simulate a mock user joining under your link to easily test and watch the milestone rewards sync!"}
+              ? "💡 Ang na-invite mong mga kaibigan ay awtomatikong magpapakita rito sa real-time kapag sila ay nag-sign up gamit ang iyong link, kasama ang kanilang live na kita." 
+              : "💡 Your invited friends will automatically appear here in real-time when they register using your link, showing their live actual earnings."}
           </p>
         </div>
       )}
