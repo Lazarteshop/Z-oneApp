@@ -986,7 +986,7 @@ export default function App() {
                   Explore featured websites and discover businesses through our platform. Businesses may also partner with us for promotional exposure and increased website visits.
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
-                  Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo at hintayings matapos ang automatic browser timer, at matatanggap mo ang iyong PPV Reward!
+                  I-explore ang mga featured homepage sa ibaba at hintaying matapos ang automatic browser timer upang makumpleto ang iyong participation sa activity.
                 </p>
               </div>
 
@@ -1634,7 +1634,12 @@ export default function App() {
                 © 2026 Website Visitor and GCash Rewards Simulation.
               </p>
               <p className="text-[10px] text-slate-400 max-w-xl mx-auto leading-relaxed font-semibold">
-                Ito ay isang interactive gamified web interface upang i-simulate ang pagbisita sa mga homepages bilang kasanayan at pagsuporta sa modernong DIGITAL advertising at automated system. Walang anumang ginagarantiyang biglaan Pagtaas or mabilisang kita ang platform na ito. Ang bawat halagang maiipon dito ay nakabase sa partisipasyon ng bawat users. 
+                Ang platform na ito ay isang interactive gamified web interface na idinisenyo para sa pag-explore ng featured content at pag-unawa sa mga konsepto ng modernong digital advertising at automated systems.
+
+Ang mga aktibidad na isinasagawa sa loob ng platform ay para sa layunin ng pakikilahok at karanasan ng gumagamit. Ang platform ay hindi nag-aalok ng garantisadong resulta, hindi nangangako ng anumang partikular na benepisyo, at hindi dapat ituring bilang isang oportunidad sa pamumuhunan o paraan ng mabilisang pagkakaroon ng kita.
+
+Ang paggamit ng platform ay napapailalim sa aming Terms of Use, Community Guidelines, at iba pang naaangkop na patakaran.
+
               </p>
             </div>
           </footer>
