@@ -70,14 +70,21 @@ const isOnGoogleCloud = !!process.env.K_SERVICE || !!process.env.GOOGLE_APPLICAT
 
 if (hasServiceAccount || isOnGoogleCloud) {
   try {
+    const isCustomProject = hasServiceAccount && serviceAccountData?.project_id && (serviceAccountData.project_id !== firebaseConfigObj.projectId);
+    
     const firestoreOptions: any = {
-      projectId: firebaseConfigObj.projectId,
-      databaseId: firebaseConfigObj.firestoreDatabaseId,
+      projectId: hasServiceAccount ? (serviceAccountData.project_id || firebaseConfigObj.projectId) : firebaseConfigObj.projectId,
     };
+
+    // If it's a custom deployed project (like on Render), use its default database,
+    // otherwise use the workspace-specific firestoreDatabaseId if defined.
+    if (!isCustomProject && firebaseConfigObj.firestoreDatabaseId) {
+      firestoreOptions.databaseId = firebaseConfigObj.firestoreDatabaseId;
+    }
 
     if (hasServiceAccount) {
       firestoreOptions.credentials = serviceAccountData;
-      console.log('🗝️ GCP: Gagamitin ang nahanap na FIREBASE_SERVICE_ACCOUNT upang kumonekta.');
+      console.log(`🗝️ GCP: Gagamitin ang nahanap na FIREBASE_SERVICE_ACCOUNT para sa project: ${firestoreOptions.projectId}`);
     }
 
     firestore = new Firestore(firestoreOptions);
@@ -1008,7 +1015,7 @@ app.post('/api/user/task-complete', (req, res) => {
             title: `⭐ Target Naabot ni ${user.name}!`,
             amount: 5.00,
             timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-            details: `Umabot na sa ₱500.00 ang naiipong kita ng na-invite mong si ${user.name}! Pwede mo nang makuha ang iyong ₱5.00 Bonus sa Referee Section!`
+            details: `Umabot na sa ₱500.00 ang naiipong kita ng na-invite mong si ${user.name}! Pwede mo nang pitasin ang iyong ₱5.00 Bonus sa Referee Section!`
           });
         }
       }
@@ -1155,7 +1162,7 @@ app.post('/api/user/daily-checkin', (req, res) => {
     return res.status(400).json({ error: 'Nakuha mo na ang iyong arawang gantimpala para sa araw na ito.' });
   }
 
-  const checkinReward = 1.00;
+  const checkinReward = 10.00;
   user.stats.balance = Number((user.stats.balance + checkinReward).toFixed(2));
   user.stats.lifetimeEarnings = Number((user.stats.lifetimeEarnings + checkinReward).toFixed(2));
   user.stats.dailyCheckInDate = todayStr;

@@ -9,6 +9,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { ReferralFriend } from '../types';
+import { soundEffects } from '../utils/audio';
 
 interface ReferralPanelProps {
   referralCode: string;
@@ -119,6 +120,7 @@ export default function ReferralPanel({
       });
       const result = await res.json();
       if (res.ok) {
+        soundEffects.playReward();
         triggerNotification(isTl ? `🎁 Tagumpay! Nakuha mo ang iyong +₱5.00 referral bonus!` : `🎁 Success! You have claimed your +₱5.00 referral bonus!`, 'success');
         await onRefreshProfile();
       } else {
