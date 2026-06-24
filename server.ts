@@ -564,7 +564,7 @@ app.post('/api/auth/register', (req, res) => {
         title: `Sumali gamit ang Link mo si ${newUser.name}`,
         amount: 0,
         timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-        details: `${newUser.name} ay gumawa ng account gamit ang iyong link. Makakakuha ka ng ₱5.00 kapag naka-ipon siya ng kanyang unang ₱500.00!`
+        details: `${newUser.name} ay gumawa ng account gamit ang iyong link. Makakakuha ka ng ₱5.00 kapag naka-ipon siya ng kanyang unang ₱100.00!`
       });
     }
   }
@@ -740,7 +740,7 @@ app.post('/api/auth/google', (req, res) => {
           title: `Sumali gamit ang Link mo si ${user.name} (Google)`,
           amount: 0,
           timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-          details: `${user.name} ay gumawa ng account gamit ang Google Sign-In at iyong referral link. Makakakuha ka ng ₱5.00 kapag naka-ipon siya ng kanyang unang ₱500.00!`
+          details: `${user.name} ay gumawa ng account gamit ang Google Sign-In at iyong referral link. Makakakuha ka ng ₱5.00 kapag naka-ipon siya ng kanyang unang ₱100.00!`
         });
       }
     }
@@ -1007,15 +1007,15 @@ app.post('/api/user/task-complete', (req, res) => {
         const oldEarnings = referrer.referredFriends[friendEntryIdx].currentEarnings;
         referrer.referredFriends[friendEntryIdx].currentEarnings = user.stats.lifetimeEarnings;
 
-        // If friend just reached 500 lifetime earnings, notify referrer
-        if (oldEarnings < 500 && user.stats.lifetimeEarnings >= 500) {
+        // If friend just reached 100 lifetime earnings, notify referrer
+        if (oldEarnings < 100 && user.stats.lifetimeEarnings >= 100) {
           referrer.activityLogs.unshift({
             id: 'log-ref-alert-' + Date.now(),
             type: 'bonus',
             title: `⭐ Target Naabot ni ${user.name}!`,
             amount: 5.00,
             timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-            details: `Umabot na sa ₱500.00 ang naiipong kita ng na-invite mong si ${user.name}! Pwede mo nang pitasin ang iyong ₱5.00 Bonus sa Referee Section!`
+            details: `Umabot na sa ₱100.00 ang naiipong kita ng na-invite mong si ${user.name}! Pwede mo nang pitasin ang iyong ₱5.00 Bonus sa Referee Section!`
           });
         }
       }
@@ -1051,12 +1051,12 @@ app.post('/api/user/claim-referral-bonus', (req, res) => {
     return res.status(404).json({ error: 'Hindi nakita si friend sa mga invited mo.' });
   }
 
-  // Check if they actual reach 500 (sync actual user info)
+  // Check if they actual reach 100 (sync actual user info)
   const actualFriend = db.users.find(u => u.id === friendId);
   const realFriendEarnings = actualFriend ? actualFriend.stats.lifetimeEarnings : friend.currentEarnings;
 
-  if (realFriendEarnings < 500) {
-    return res.status(400).json({ error: `Humihingi ng paumanhin: Kailangan muna maabot ni ${friend.name} ang ₱500.00 lifetime earnings. (Kasalukuyan: ₱${realFriendEarnings.toFixed(2)})` });
+  if (realFriendEarnings < 100) {
+    return res.status(400).json({ error: `Humihingi ng paumanhin: Kailangan muna maabot ni ${friend.name} ang ₱100.00 lifetime earnings. (Kasalukuyan: ₱${realFriendEarnings.toFixed(2)})` });
   }
 
   if (friend.bonusClaimed) {
@@ -1095,8 +1095,8 @@ app.post('/api/user/withdraw', (req, res) => {
   }
 
   const requestedAmount = Number(amount);
-  if (isNaN(requestedAmount) || requestedAmount < 200) {
-    return res.status(400).json({ error: 'Ang minimum na withdrawal ay ₱200.00.' });
+  if (isNaN(requestedAmount) || requestedAmount < 100) {
+    return res.status(400).json({ error: 'Ang minimum na withdrawal ay ₱100.00.' });
   }
 
   const db = loadDB();
@@ -1379,7 +1379,7 @@ app.post('/api/admin/simulate-mock-friend', (req, res) => {
     title: `Sumali gamit ang link mo si ${friendName}`,
     amount: 0,
     timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-    details: `Salamat sa pagtawag kay ${friendName}! Pumasok siya sa server. Makukuha mo ang ₱5.00 kapag naabot niya ang ₱500 na kabuuang kita.`
+    details: `Salamat sa pagtawag kay ${friendName}! Pumasok siya sa server. Makukuha mo ang ₱5.00 kapag naabot niya ang ₱100 na kabuuang kita.`
   });
 
   saveDB(db);
@@ -1396,7 +1396,7 @@ app.post('/api/admin/simulate-friend-earnings', (req, res) => {
   if (!friend) return res.status(404).json({ error: 'Kaibigan ay hindi nahanap.' });
 
   // Add earnings to push them over the edges
-  friend.stats.lifetimeEarnings = Math.min(500, friend.stats.lifetimeEarnings + 150);
+  friend.stats.lifetimeEarnings = Math.min(100, friend.stats.lifetimeEarnings + 150);
   friend.stats.balance += 150;
 
   // Sync back to their referrer referredFriends entry
@@ -1414,7 +1414,7 @@ app.post('/api/admin/simulate-friend-earnings', (req, res) => {
             title: `⭐ Milestone Naabot ni ${friend.name}!`,
             amount: 5.00,
             timestamp: new Date().toLocaleString('fil-PH', { hour12: true }),
-            details: `Mayroon nang higit sa ₱500.00 na kita si ${friend.name}! Iyong i-claim ang iyong ₱5.00 Referral reward ngayon.`
+            details: `Mayroon nang higit sa ₱100.00 na kita si ${friend.name}! Iyong i-claim ang iyong ₱5.00 Referral reward ngayon.`
           });
         }
       }
