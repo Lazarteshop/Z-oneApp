@@ -68,8 +68,8 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit, lan
       return;
     }
 
-    if (value < 200) {
-      setErrorMsg(isTl ? '⚠️ May limitasyon: Ang minimum na withdrawal ay nagkakahalaga ng ₱200.00.' : '⚠️ Limit: Minimum withdrawal amount is ₱200.00.');
+    if (value < 100) {
+      setErrorMsg(isTl ? '⚠️ May limitasyon: Ang minimum na withdrawal ay nagkakahalaga ng ₱100.00.' : '⚠️ Limit: Minimum withdrawal amount is ₱100.00.');
       return;
     }
 
@@ -143,7 +143,7 @@ export default function GCashCashout({ stats, withdrawals, onWithdrawSubmit, lan
           <div>
             <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 sm:text-right">{isTl ? "Minimum na Widthrawal" : "Minimum Withdrawal"}</p>
             <p className="text-sm font-extrabold text-blue-600 mt-0.5 sm:text-right">
-              ₱200.00 PHP
+              ₱100.00 PHP
             </p>
           </div>
         </div>
