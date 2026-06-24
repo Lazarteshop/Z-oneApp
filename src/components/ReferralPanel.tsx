@@ -152,8 +152,8 @@ export default function ReferralPanel({
       <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100/60 rounded-xl p-3 text-xs leading-relaxed">
         <p className="text-[11px] font-semibold text-slate-700">
           {isTl 
-            ? "Ibahagi ang iyong referral link sa ibaba. Kapag nag-sign-up ang iyong kaibigan at naka-ipon ng kanyang unang ₱500.00 sa platform simulator, makakatanggap ka ng instant ₱5.00 bonus!" 
-            : "Share your referral link below. Once your friend signs up and accumulates ₱500.00 inside the simulator, you will receive an instant ₱5.00 bonus!"}
+            ? "Ibahagi ang iyong referral link sa ibaba at anyayahan ang iyong mga kaibigan na tuklasin ang mga interactive features ng platform. Kapag nakumpleto nila ang mga kinakailangang aktibidad alinsunod sa aming Terms and Community Guidelines, maaaring magkaroon ng available referral incentives para sa mga kwalipikadong kalahok." 
+            : "Ibahagi ang iyong referral link sa ibaba at anyayahan ang iyong mga kaibigan na tuklasin ang mga interactive features ng platform. Kapag nakumpleto nila ang mga kinakailangang aktibidad alinsunod sa aming Terms and Community Guidelines, maaaring magkaroon ng available referral incentives para sa mga kwalipikadong kalahok."}
         </p>
       </div>
 
@@ -186,7 +186,7 @@ export default function ReferralPanel({
             {isTl ? `Mga Na-invite Mo (${referredFriends.length})` : `Your Referrals (${referredFriends.length})`}
           </label>
           <span className="text-[9px] text-indigo-600 font-bold hover:underline cursor-pointer">
-            {isTl ? "Milestone: ₱500.00" : "Milestone: ₱500.00"}
+            {isTl ? "Milestone: ₱100.00" : "Milestone: ₱100.00"}
           </span>
         </div>
 
@@ -197,9 +197,9 @@ export default function ReferralPanel({
         ) : (
           <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
             {referredFriends.map((friend) => {
-              const isEligible = friend.currentEarnings >= 500;
+              const isEligible = friend.currentEarnings >= 100;
               const hasClaimed = friend.bonusClaimed;
-              const progressPct = Math.min(100, Math.floor((friend.currentEarnings / 500) * 100));
+              const progressPct = Math.min(100, Math.floor((friend.currentEarnings / 100) * 100));
 
               return (
                 <div key={friend.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 text-xs space-y-2">
@@ -230,7 +230,7 @@ export default function ReferralPanel({
                         </button>
                       ) : (
                         <span className="bg-slate-100 border border-slate-200 text-slate-550 text-[9px] px-2 py-0.5 rounded font-black">
-                          ₱{friend.currentEarnings.toFixed(0)} / 500
+                          ₱{friend.currentEarnings.toFixed(0)} / 100
                         </span>
                       )}
                     </div>
