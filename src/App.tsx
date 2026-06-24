@@ -901,7 +901,7 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 font-semibold">Mag-open ng website homepage upang makatipon ng totoong pera.</p>
+                  <p className="text-[11px] text-slate-400 font-semibold">Explore featured websites and participate in platform activities to enjoy available PPV rewards, subject to our terms and guidelines.</p>
                 </div>
               </div>
 
@@ -983,7 +983,7 @@ export default function App() {
                   <span>₱0.01 - ₱50.00 PER SIMULATED HOME VIEW</span>
                 </span>
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-tight max-w-xl">
-                  Get rewarded sa Simpleng Pagbukas ng Homepage ng mga Website ng aming mga advertisers or you can contact us to advetise your business for promotional purposes to get your organic leads, prospects, and website visitors for your website analytics or website monetization.
+                  Explore featured websites and discover businesses through our platform. Businesses may also partner with us for promotional exposure and increased website visits.
                 </h2>
                 <p className="text-slate-400 text-xs max-w-lg font-semibold">
                   Suriin ang listahan sa ibaba, i-click ang homepage, manatili ng ilang segundo at hintayings matapos ang automatic browser timer, at matatanggap mo ang iyong PPV Reward!
